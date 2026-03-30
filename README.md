@@ -34,6 +34,7 @@ Médaillon Bronze → Silver → Gold · Sources 100% gratuites · Orchestration
 | Financials | Croissance CA, marge, dette, FCF → 0–10 | 25% |
 | Insider | Achats/ventes dirigeants sur 6 mois → 0–10 | 25% |
 | News | Sentiment pondéré par fraîcheur → 0–10 | 15% |
+| Final Score | TBC | TBD |
 
 `score_composite = 0.35 × stocks + 0.25 × financials + 0.25 × insider + 0.15 × news`
 
