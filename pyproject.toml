@@ -20,5 +20,8 @@ dev = [
     "pytest",
 ]
 
+[tool.setuptools.packages.find]
+include = ["bronze*"]
+
 [tool.ruff]
 line-length = 100
