@@ -4,9 +4,14 @@ __pycache__/
 
 # Env
 .env
+.envrc
+.venv/
 
 # Claude
 .claude/
 
 # OS
 .DS_Store
+
+# Packaging
+pea_pme_pulse.egg-info/
