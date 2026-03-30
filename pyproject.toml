@@ -1,0 +1,24 @@
+[project]
+name = "pea-pme-pulse"
+version = "0.1.0"
+description = "Daily investment signal engine for PEA-PME holdings"
+requires-python = ">=3.11"
+dependencies = [
+    "requests",
+    "beautifulsoup4",
+    "lxml",
+    "yfinance",
+    "ta",
+    "feedparser",
+    "pandas",
+    "rapidfuzz",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff",
+    "pytest",
+]
+
+[tool.ruff]
+line-length = 100
