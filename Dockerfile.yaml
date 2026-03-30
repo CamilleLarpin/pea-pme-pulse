@@ -1,0 +1,40 @@
+FROM python:3.11-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    POETRY_VIRTUALENVS_CREATE=false \
+    PATH="/usr/local/bin:${PATH}"
+
+WORKDIR /app
+
+# Outils système utiles pour dbt / builds Python / Makefile
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    curl \
+    git \
+    make \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+# Installer les dépendances Python si le dépôt fournit un requirements.txt ou un pyproject.toml.
+# Le Dockerfile reste volontairement tolérant pour s'adapter à la structure réelle du dépôt.
+COPY requirements.txt pyproject.toml poetry.lock* ./
+RUN python -m pip install --upgrade pip setuptools wheel \
+    && if [ -f requirements.txt ]; then pip install -r requirements.txt; fi \
+    && if [ -f pyproject.toml ]; then \
+         pip install "poetry>=1.8" \
+         && poetry config virtualenvs.create false \
+         && poetry install --no-interaction --no-ansi; \
+       fi
+
+# Copier le projet
+COPY . .
+
+# Vérification légère: ne bloque pas le build si certaines dépendances optionnelles sont absentes
+RUN python -m pip check || true
+
+# Point d'entrée neutre.
+# Pour dbt : docker run ... dbt run
+# Pour Prefect : docker run ... prefect deploy
+CMD ["bash"]
