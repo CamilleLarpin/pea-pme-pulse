@@ -1,18 +1,9 @@
 # Python
 __pycache__/
 *.py[cod]
-*.egg-info/
-.venv/
-venv/
-dist/
-build/
 
 # Env
 .env
-.env.*
-
-# Data
-data/
 
 # Claude
 .claude/
