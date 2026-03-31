@@ -4,10 +4,9 @@
 
 ```
 src/
-├── bronze/       # ingestion — one module per source
+├── bronze/       # ingestion — one module per source (incl. boursorama)
 ├── silver/       # cleaning/parsing
 └── gold/         # scoring & ranking
-boursorama/       # referentiel scraper
 referentiel/      # referentiel files (CSV)
 dbt/              # transformations (TBD)
 scripts/          # dev/exploration scripts
@@ -31,13 +30,9 @@ project-pea-pme
 │   ├── abcbourse_rss
 │   └── boursorama
 ├── silver
-│   ├── yahoo_rss
-│   ├── amf
-│   ├── abcbourse_rss
-│   └── ohlc
+│   └── ... (naming convention TBD)
 └── gold
-    ├── pea_pme_pulse     # composite scores
-    └── ranking_top20
+    └── ... (naming convention TBD)
 ```
 
 ---
