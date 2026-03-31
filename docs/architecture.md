@@ -39,12 +39,16 @@ project-pea-pme
 
 ## Google Cloud Storage
 
-GCS is used only for sources that produce raw files (PDFs, XMLs) before BQ load.
-RSS and yfinance write directly to BigQuery — no GCS step.
+GCS stores raw data that cannot be re-fetched. Two rules:
+- **RSS feeds** — ephemeral, no history → full raw feed dumped to GCS at fetch time, then filtered + matched entries loaded to BQ Bronze
+- **AMF** — full history available via API → GCS for auditability of original regulatory documents (PDFs/XMLs)
+- **yfinance** — structured data fetched by ISIN, always re-fetchable → straight to BQ Bronze, no GCS step
 
 ```
 gs://project_bucket/
-└── amf/          # AMF PDFs/XMLs only
+├── rss_yahoo/    # raw feed dumps, timestamped
+├── rss_abcbourse/
+└── amf/          # AMF PDFs/XMLs
 ```
 
 ---
@@ -58,6 +62,8 @@ Pattern: `{SERVICE}_{SOURCE}_{RESOURCE}`
 | `GCP_PROJECT_ID` | `project-pea-pme` |
 | `GCS_BUCKET_NAME` | `project_bucket` |
 | `GCS_AMF_PREFIX` | `amf` |
+| `GCS_YAHOO_PREFIX` | `rss_yahoo` |
+| `GCS_ABCBOURSE_PREFIX` | `rss_abcbourse` |
 | `BQ_AMF_DATASET` | `bronze` |
 | `BQ_AMF_TABLE` | `amf` |
 | `BQ_YAHOO_DATASET` | `bronze` |
