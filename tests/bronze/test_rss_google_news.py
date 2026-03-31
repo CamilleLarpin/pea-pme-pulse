@@ -3,7 +3,7 @@
 import pandas as pd
 import pytest
 
-from bronze.rss_google_news import fetch_all_feeds, match_companies
+from bronze.rss_google_news import fetch_all_feeds, match_companies, _clean_title
 
 REFERENTIEL = pd.DataFrame([
     {"ticker_bourso": "1rPTHEP", "name": "THERMADOR", "isin": "FR0013333432"},
@@ -91,6 +91,33 @@ def test_short_name_no_false_positive():
 def test_short_name_exact_match():
     df = match_companies([_entry("LISI annonce une acquisition majeure")], REFERENTIEL)
     assert df.iloc[0]["isin"] == "FR0000050353"
+
+
+def test_clean_title_strips_source_suffix():
+    assert _clean_title("THERMADOR annonce ses résultats - lefigaro.fr") == "THERMADOR annonce ses résultats"
+    assert _clean_title("Hexaom prévoit une hausse - Ouest-France") == "Hexaom prévoit une hausse - Ouest-France"  # no domain, unchanged
+    assert _clean_title("NFL Biosciences s'introduit en bourse - euronext.com") == "NFL Biosciences s'introduit en bourse"
+
+
+def test_blocklisted_name_not_matched():
+    """OPTION is a blocklisted name — should not match even if score >= 80."""
+    ref = pd.DataFrame([{"ticker_bourso": "X", "name": "OPTION", "isin": "BE0974496284"}])
+    df = match_companies([_entry("La France et l'Europe prennent de nouvelles mesures - Option Finance")], ref)
+    assert pd.isna(df.iloc[0]["isin"])
+
+
+def test_word_boundary_no_false_positive():
+    """NEURONES should not match a title containing 'Euronext' (partial substring)."""
+    ref = pd.DataFrame([{"ticker_bourso": "Y", "name": "NEURONES", "isin": "FR0004050250"}])
+    df = match_companies([_entry("Euronext Growth All Share | Cours Indice en direct - Investing.com")], ref)
+    assert pd.isna(df.iloc[0]["isin"])
+
+
+def test_url_suffix_false_positive_cleaned():
+    """ER CAPITAL should not match 'stratégique de l'année - capital.fr' after title cleaning."""
+    ref = pd.DataFrame([{"ticker_bourso": "Z", "name": "ER CAPITAL", "isin": "NL0010389508"}])
+    df = match_companies([_entry("Bourse 2025 : pourquoi les actions sont le choix stratégique de l'année - capital.fr")], ref)
+    assert pd.isna(df.iloc[0]["isin"])
 
 
 def test_deduplication(monkeypatch):
