@@ -6,16 +6,16 @@ import pytest
 from bronze.rss_yahoo_fr import match_companies
 
 REFERENTIEL = pd.DataFrame([
-    {"ticker_bourso": "1rPTHEP", "nom": "THERMADOR", "isin": "FR0013333432"},
-    {"ticker_bourso": "1rPMDM", "nom": "MAISONS DU MONDE", "isin": "FR0013153541"},
-    {"ticker_bourso": "1rPVK", "nom": "VALLOUREC", "isin": "FR0013506730"},
-    {"ticker_bourso": "1rPFII", "nom": "LISI", "isin": "FR0000050353"},
-    {"ticker_bourso": "1rPALCLA", "nom": "CLARANOVA", "isin": "FR0013426004"},
+    {"ticker_bourso": "1rPTHEP", "name": "THERMADOR", "isin": "FR0013333432"},
+    {"ticker_bourso": "1rPMDM", "name": "MAISONS DU MONDE", "isin": "FR0013153541"},
+    {"ticker_bourso": "1rPVK", "name": "VALLOUREC", "isin": "FR0013506730"},
+    {"ticker_bourso": "1rPFII", "name": "LISI", "isin": "FR0000050353"},
+    {"ticker_bourso": "1rPALCLA", "name": "CLARANOVA", "isin": "FR0013426004"},
 ])
 
 REQUIRED_COLS = [
     "title", "link", "published", "summary", "fetched_at",
-    "matched_nom", "match_score", "isin", "ticker_bourso",
+    "matched_name", "match_score", "isin", "ticker_bourso",
 ]
 
 

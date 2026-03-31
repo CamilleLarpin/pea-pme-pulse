@@ -9,10 +9,13 @@ from rapidfuzz import fuzz, process
 # TODO: verify exact URL with team before production
 FEED_URL = "https://fr.finance.yahoo.com/news/rssindex"
 
-# TODO: fill in once GCP project/dataset/service account are ready
+# TODO: fill in once GCP project/service account are ready
 BQ_PROJECT = "TODO"
-BQ_DATASET = "TODO"
-BQ_TABLE = "bronze_yahoo_rss"
+BQ_DATASET = "bronze"
+BQ_TABLE = "yahoo_rss"
+
+GCS_BUCKET = "TODO"
+GCS_PREFIX = "rss_yahoo"
 
 MATCH_THRESHOLD = 80
 
@@ -33,13 +36,30 @@ def fetch_feed(url: str = FEED_URL) -> list[dict]:
     ]
 
 
+def dump_to_gcs(entries: list[dict]) -> None:
+    """Dump raw feed entries to GCS as JSON (timestamped).
+
+    RSS feeds have no history — raw dump preserves original data before any filtering.
+
+    TODO: implement once GCP project/service account are ready.
+    import json
+    from google.cloud import storage
+    client = storage.Client(project=GCS_BUCKET)
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    blob_path = f"{GCS_PREFIX}/{timestamp}.json"
+    bucket = client.bucket(GCS_BUCKET)
+    bucket.blob(blob_path).upload_from_string(json.dumps(entries), content_type="application/json")
+    """
+    raise NotImplementedError("GCS dump not yet configured — awaiting GCP setup")
+
+
 def match_companies(entries: list[dict], referentiel: pd.DataFrame) -> pd.DataFrame:
     """Fuzzy-match article titles against company names (rapidfuzz >= 80).
 
     Matched entries get isin + ticker_bourso attached.
     Unmatched entries are kept with null values for those fields.
     """
-    company_names = referentiel["nom"].tolist()
+    company_names = referentiel["name"].tolist()
     rows = []
     for entry in entries:
         match = process.extractOne(
@@ -51,10 +71,10 @@ def match_companies(entries: list[dict], referentiel: pd.DataFrame) -> pd.DataFr
         )
         if match:
             matched_name, score, _ = match
-            ref_row = referentiel[referentiel["nom"] == matched_name].iloc[0]
+            ref_row = referentiel[referentiel["name"] == matched_name].iloc[0]
             rows.append({
                 **entry,
-                "matched_nom": matched_name,
+                "matched_name": matched_name,
                 "match_score": score,
                 "isin": ref_row["isin"],
                 "ticker_bourso": ref_row["ticker_bourso"],
@@ -62,7 +82,7 @@ def match_companies(entries: list[dict], referentiel: pd.DataFrame) -> pd.DataFr
         else:
             rows.append({
                 **entry,
-                "matched_nom": None,
+                "matched_name": None,
                 "match_score": None,
                 "isin": None,
                 "ticker_bourso": None,
@@ -71,9 +91,9 @@ def match_companies(entries: list[dict], referentiel: pd.DataFrame) -> pd.DataFr
 
 
 def write_to_bigquery(df: pd.DataFrame) -> None:
-    """Write matched records to BigQuery Bronze table.
+    """Write matched records to BigQuery bronze.yahoo_rss.
 
-    TODO: implement once GCP project/dataset/service account are ready.
+    TODO: implement once GCP project/service account are ready.
     from google.cloud import bigquery
     client = bigquery.Client(project=BQ_PROJECT)
     table_id = f"{BQ_PROJECT}.{BQ_DATASET}.{BQ_TABLE}"
@@ -83,8 +103,9 @@ def write_to_bigquery(df: pd.DataFrame) -> None:
 
 
 def run(referentiel: pd.DataFrame) -> pd.DataFrame:
-    """Fetch, match, and load Yahoo Finance FR RSS entries."""
+    """Fetch, dump to GCS, match, and load Yahoo Finance FR RSS entries."""
     entries = fetch_feed()
+    dump_to_gcs(entries)
     df = match_companies(entries, referentiel)
     write_to_bigquery(df)
     return df
