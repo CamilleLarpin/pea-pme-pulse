@@ -43,14 +43,14 @@ project-pea-pme
 
 GCS stores raw data that cannot be re-fetched. Two rules:
 - **RSS feeds** — ephemeral, no history → full raw feed dumped to GCS at fetch time, then filtered + matched entries loaded to BQ Bronze
-- **AMF** — full history available via API → GCS for auditability of original regulatory documents (PDFs/XMLs)
+- **AMF** — full history available via API → GCS for auditability of original regulatory documents (PDFs/XMLs/json)
 - **yfinance** — structured data fetched by ISIN, always re-fetchable → straight to BQ Bronze, no GCS step
 
 ```
 gs://project_bucket/
 ├── rss_yahoo/    # raw feed dumps, timestamped
 ├── rss_abcbourse/
-└── amf/          # AMF PDFs/XMLs
+└── amf/          # AMF PDFs/XMLs/json
 ```
 
 ---
