@@ -118,5 +118,9 @@ def run(referentiel: pd.DataFrame) -> pd.DataFrame:
     entries = fetch_feed()
     dump_to_gcs(entries)
     df = match_companies(entries, referentiel)
-    write_to_bigquery(df)
+    matched = df[df["isin"].notna()]
+    if not matched.empty:
+        write_to_bigquery(matched)
+    else:
+        print("BQ load: no matched companies — skipping")
     return df
