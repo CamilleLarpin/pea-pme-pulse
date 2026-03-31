@@ -55,21 +55,13 @@ gs://project_bucket/
 
 ---
 
-## Environment variable naming
-
-Pattern: `{SERVICE}_{SOURCE}_{RESOURCE}`
+## Environment variable naming - TBD
 
 | Variable | Example value |
 |---|---|
-| `GCP_PROJECT_ID` | `project-pea-pme` |
-| `GCS_BUCKET_NAME` | `project_bucket` |
-| `GCS_AMF_PREFIX` | `amf` |
-| `GCS_YAHOO_PREFIX` | `rss_yahoo` |
-| `GCS_ABCBOURSE_PREFIX` | `rss_abcbourse` |
-| `BQ_AMF_DATASET` | `bronze` |
-| `BQ_AMF_TABLE` | `amf` |
-| `BQ_YAHOO_DATASET` | `bronze` |
-| `BQ_YAHOO_TABLE` | `yahoo_rss` |
+| `GCP_PROJECT_ID` | `bootcamp-project-pea-pme` |
+| `GCS_BUCKET_NAME` | `project-pea-pme` |
+
 
 ---
 
