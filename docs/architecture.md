@@ -7,14 +7,16 @@ src/
 ├── bronze/       # ingestion — one module per source (incl. boursorama)
 ├── silver/       # cleaning/parsing
 └── gold/         # scoring & ranking
-referentiel/      # referentiel files (CSV)
-dbt/              # transformations (TBD)
-scripts/          # dev/exploration scripts
-tests/            # mirrors src/ structure
+referentiel/      # static reference data files (CSV) — companies list used to match/join across sources
+dbt/              # SQL transformation models running on BigQuery (Silver/Gold logic)
+scripts/          # one-off dev/exploration scripts — never imported by pipeline code
+tests/            # unit and integration tests — mirrors src/ structure (tests/bronze/, tests/silver/, tests/gold/)
 docs/             # this folder
 ```
 
 Pipeline code lives under `src/` · tooling and data files at root level.
+
+> Note: `boursorama/` at root is temporary — the Boursorama scraper should move to `src/bronze/boursorama.py` to follow this layout.
 
 ---
 
