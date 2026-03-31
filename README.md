@@ -57,4 +57,6 @@ Médaillon Bronze → Silver → Gold · Sources 100% gratuites · Orchestration
 python -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
+# Only if you don't have .env yet
+cp -n .env.example .env
 ```
