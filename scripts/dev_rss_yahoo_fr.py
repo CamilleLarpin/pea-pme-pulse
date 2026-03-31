@@ -23,7 +23,7 @@ for i, e in enumerate(entries):
     print(f"[{i:02d}] {e['title']}")
 
 # --- Step 2: match against referentiel ---
-referentiel_path = Path(__file__).parent.parent / "referentiel" / "companies_draft.csv"
+referentiel_path = Path(__file__).parent.parent / "boursorama" / "boursorama_peapme_final.csv"
 referentiel = pd.read_csv(referentiel_path)
 
 print(f"\n--- Matching against {len(referentiel)} companies in referentiel ---\n")
@@ -39,4 +39,4 @@ if not matched.empty:
     print("--- Matched entries ---")
     for _, row in matched.iterrows():
         print(f"  [{row['match_score']:.0f}] {row['title'][:70]}")
-        print(f"       → {row['matched_nom']} ({row['isin']})")
+        print(f"       → {row['matched_name']} ({row['isin']})")

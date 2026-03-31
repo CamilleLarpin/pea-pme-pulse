@@ -12,6 +12,9 @@ dependencies = [
     "feedparser",
     "pandas",
     "rapidfuzz",
+    "google-cloud-bigquery",
+    "google-cloud-storage",
+    "pandas-gbq",
 ]
 
 [project.optional-dependencies]

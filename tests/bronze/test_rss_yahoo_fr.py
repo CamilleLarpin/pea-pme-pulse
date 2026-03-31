@@ -64,3 +64,15 @@ def test_multiple_matches():
     df = match_companies(entries, REFERENTIEL)
     assert df.iloc[0]["isin"] == "FR0013426004"
     assert df.iloc[1]["isin"] == "FR0000050353"
+
+
+def test_short_name_no_false_positive():
+    # "LISI" (4 chars) should NOT match an unrelated article despite substring presence
+    df = match_companies([_entry("Analyse des marchés financiers mondiaux")], REFERENTIEL)
+    assert pd.isna(df.iloc[0]["isin"])
+
+
+def test_short_name_exact_match():
+    # "LISI" should still match when it appears explicitly in the title
+    df = match_companies([_entry("LISI annonce une acquisition majeure")], REFERENTIEL)
+    assert df.iloc[0]["isin"] == "FR0000050353"
