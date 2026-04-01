@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 import feedparser
 import pandas as pd
 from google.cloud import bigquery, storage
+from loguru import logger
 from rapidfuzz import fuzz, process
 
 FEED_URLS = {
@@ -101,7 +102,7 @@ def dump_to_gcs(entries: list[dict]) -> None:
         json.dumps(entries, ensure_ascii=False),
         content_type="application/json",
     )
-    print(f"GCS dump: gs://{GCS_BUCKET}/{blob_path}")
+    logger.info("GCS dump: gs://{}/{}", GCS_BUCKET, blob_path)
 
 
 def _scorer_for(name: str):
@@ -162,7 +163,7 @@ def write_to_bigquery(df: pd.DataFrame) -> None:
     table_id = f"{BQ_PROJECT}.{BQ_DATASET}.{BQ_TABLE}"
     job = client.load_table_from_dataframe(df, table_id)
     job.result()
-    print(f"BQ load: {len(df)} rows → {table_id}")
+    logger.info("BQ load: {} rows → {}", len(df), table_id)
 
 
 def run(referentiel: pd.DataFrame) -> pd.DataFrame:
@@ -174,5 +175,5 @@ def run(referentiel: pd.DataFrame) -> pd.DataFrame:
     if not matched.empty:
         write_to_bigquery(matched)
     else:
-        print("BQ load: no matched companies — skipping")
+        logger.info("BQ load: no matched companies — skipping")
     return df

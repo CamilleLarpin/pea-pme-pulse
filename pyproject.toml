@@ -12,6 +12,10 @@ dependencies = [
     "feedparser",
     "pandas",
     "rapidfuzz",
+    "google-cloud-bigquery",
+    "google-cloud-storage",
+    "pandas-gbq",
+    "loguru",
 ]
 
 [project.optional-dependencies]
@@ -19,6 +23,12 @@ dev = [
     "ruff",
     "pytest",
 ]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
 
 [tool.ruff]
 line-length = 100
