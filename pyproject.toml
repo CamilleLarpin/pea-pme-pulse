@@ -15,6 +15,7 @@ dependencies = [
     "google-cloud-bigquery",
     "google-cloud-storage",
     "pandas-gbq",
+    "loguru",
 ]
 
 [project.optional-dependencies]
