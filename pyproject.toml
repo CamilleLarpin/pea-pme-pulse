@@ -32,3 +32,38 @@ pythonpath = ["src"]
 
 [tool.ruff]
 line-length = 100
+target-version = "py311"
+
+# Excluded folders
+exclude = [
+    ".git",
+    "__pycache__",
+    ".venv",
+    "build",
+    "dist",
+]
+
+# Activated rules
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle
+    "F",   # pyflakes (bugs)
+    "I",   # isort (imports)
+    "UP",  # python modernisation
+    "B",   # bugbear (good patterns)
+    "SIM", # simplifications
+]
+
+ignore = [
+    "E501",  # over-length line
+]
+
+# Import sorting
+[tool.ruff.lint.isort]
+known-first-party = ["src"]
+
+# Ruff formater
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
