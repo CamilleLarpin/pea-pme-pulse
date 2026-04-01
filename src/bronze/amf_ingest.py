@@ -69,7 +69,7 @@ def load_config() -> Config:
         dataset_id=os.environ.get("BQ_DATASET_ID", "bronze"),
         table_id=DATA_SOURCE,
         staging_table_id=os.environ.get("BQ_STAGING_TABLE_ID", f"{DATA_SOURCE}_staging"),
-        csv_path="referentiel/companies_draft.csv",/home/soratobiyufo/code/Ouffo/final_project/pea-pme-pulse/boursorama/boursorama_peapme_final.csv
+        csv_path=os.environ.get("REFERENTIEL_PATH", "referentiel/boursorama_peapme_final.csv"),
         gcs_prefix=DATA_SOURCE,
         chunk_size=200,
         request_timeout=120,
