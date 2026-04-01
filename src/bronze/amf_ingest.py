@@ -69,7 +69,7 @@ def load_config() -> Config:
         dataset_id=os.environ.get("BQ_DATASET_ID", "bronze"),
         table_id=DATA_SOURCE,
         staging_table_id=os.environ.get("BQ_STAGING_TABLE_ID", f"{DATA_SOURCE}_staging"),
-        csv_path="referentiel/companies_draft.csv",
+        csv_path="referentiel/companies_draft.csv",/home/soratobiyufo/code/Ouffo/final_project/pea-pme-pulse/boursorama/boursorama_peapme_final.csv
         gcs_prefix=DATA_SOURCE,
         chunk_size=200,
         request_timeout=120,
@@ -543,8 +543,6 @@ def inject_bq(config: Config, clean_uri: str) -> None:
     ensure_dataset_exists(bq_client, config.project_id, config.dataset_id, config.location)
     ensure_table_exists(bq_client, config.full_table_id)
     ensure_table_exists(bq_client, config.full_staging_table_id)
-
-    truncate_staging_table(bq_client, config.full_staging_table_id)
 
     gcs_to_bq(
         client=bq_client,

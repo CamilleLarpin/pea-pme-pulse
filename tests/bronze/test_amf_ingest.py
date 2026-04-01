@@ -6,7 +6,7 @@ from unittest.mock import Mock
 
 import pytest
 
-import src.bronze.amf_ingest as mod
+import bronze.amf_ingest as mod
 
 
 # ============================================================================
