@@ -1,0 +1,33 @@
+# Prefect deployment — Bronze RSS daily ingestion
+# Deploy: prefect deploy --name bronze-rss-daily
+# Worker: prefect worker start --pool bronze-rss-pool
+
+name: pea-pme-pulse
+prefect-version: "3.*"
+
+build: null
+push: null
+
+pull:
+  - prefect.deployments.steps.git_clone:
+      repository: https://github.com/CamilleLarpin/pea-pme-pulse.git
+      branch: main
+
+deployments:
+  - name: bronze-rss-daily
+    version: "0.1.0"
+    tags: ["bronze", "rss"]
+    description: "Daily Bronze RSS ingestion — Yahoo Finance FR + Google News (post-close 18:30 CET)"
+
+    entrypoint: src/flows/bronze_rss.py:bronze_rss_daily
+
+    schedule:
+      cron: "30 17 * * 1-5"   # 17:30 UTC = 18:30 CET (Mon–Fri, post-market close)
+      timezone: "Europe/Paris"
+
+    work_pool:
+      name: bronze-rss-pool
+      work_queue_name: default
+      job_variables:
+        env:
+          REFERENTIEL_PATH: /app/referentiel/boursorama_peapme_final.csv
