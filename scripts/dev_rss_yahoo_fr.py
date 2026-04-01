@@ -7,7 +7,7 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from bronze.rss_yahoo_fr import fetch_feed, match_companies, FEED_URL
+from bronze.rss_yahoo_fr import FEED_URL, fetch_feed, match_companies
 
 # --- Step 1: fetch and print raw titles ---
 print(f"\n Fetching: {FEED_URL}\n")
