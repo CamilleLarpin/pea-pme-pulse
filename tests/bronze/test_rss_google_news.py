@@ -2,7 +2,7 @@
 
 import pandas as pd
 
-from bronze.rss_google_news import fetch_all_feeds, match_companies, _clean_title
+from bronze.rss_google_news import _clean_title, fetch_all_feeds, match_companies
 
 REFERENTIEL = pd.DataFrame(
     [

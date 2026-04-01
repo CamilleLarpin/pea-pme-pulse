@@ -5,21 +5,18 @@ import json
 import os
 import re
 import tempfile
+from collections.abc import Iterator
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Iterator
 
 import requests
+from google.api_core.exceptions import Conflict
+from google.cloud import bigquery, storage
+from google.cloud.exceptions import NotFound
 from loguru import logger
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
-
-from google.api_core.exceptions import Conflict
-from google.cloud import bigquery
-from google.cloud import storage
-from google.cloud.exceptions import NotFound
-
 
 # ============================================================================
 # Configuration
@@ -31,9 +28,7 @@ BASE_URL = (
     "datasets/flux-amf-new-prod/exports/jsonl"
 )
 
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (compatible; OuffoIngestor/2.0)"
-}
+HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; OuffoIngestor/2.0)"}
 
 ISIN_REGEX = re.compile(r"^[A-Z]{2}[A-Z0-9]{9}[0-9]$")
 
@@ -69,7 +64,7 @@ def load_config() -> Config:
         dataset_id=os.environ.get("BQ_DATASET_ID", "bronze"),
         table_id=DATA_SOURCE,
         staging_table_id=os.environ.get("BQ_STAGING_TABLE_ID", f"{DATA_SOURCE}_staging"),
-        csv_path=os.environ.get("REFERENTIEL_PATH", "referentiel/boursorama_peapme_final.csv"),
+        csv_path="referentiel/boursorama_peapme_final.csv",
         gcs_prefix=DATA_SOURCE,
         chunk_size=200,
         request_timeout=120,
@@ -96,17 +91,18 @@ BQ_SCHEMA: list[bigquery.SchemaField] = [
 # Utilities
 # ============================================================================
 
+
 def utc_now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def isoformat_utc(dt: datetime) -> str:
-    return dt.astimezone(timezone.utc).isoformat()
+    return dt.astimezone(UTC).isoformat()
 
 
 def chunked(items: list[str], size: int) -> Iterator[list[str]]:
     for i in range(0, len(items), size):
-        yield items[i:i + size]
+        yield items[i : i + size]
 
 
 def build_requests_session() -> requests.Session:
@@ -151,7 +147,7 @@ def parse_api_datetime(value: object) -> str | None:
 
     # Simple format "YYYY-MM-DD"
     try:
-        dt = datetime.strptime(raw, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        dt = datetime.strptime(raw, "%Y-%m-%d").replace(tzinfo=UTC)
         return isoformat_utc(dt)
     except ValueError:
         logger.warning("Unable to parse publication date: {}", raw)
@@ -166,11 +162,12 @@ def validate_isin(value: str) -> bool:
 # CSV / Targets
 # ============================================================================
 
+
 def load_targets(csv_path: str) -> set[str]:
     targets: set[str] = set()
     invalid_count = 0
 
-    with open(csv_path, "r", encoding="utf-8", newline="") as csv_file:
+    with open(csv_path, encoding="utf-8", newline="") as csv_file:
         reader = csv.DictReader(csv_file)
 
         if "isin" not in (reader.fieldnames or []):
@@ -198,6 +195,7 @@ def load_targets(csv_path: str) -> set[str]:
 # API
 # ============================================================================
 
+
 def build_where_clause(isins: list[str]) -> str:
     safe_isins = []
     for isin in isins:
@@ -215,16 +213,18 @@ def fetch_export_jsonl(
     timeout: int,
 ) -> requests.Response:
     params = {
-        "select": ",".join([
-            "recordid",
-            "identificationsociete_iso_nom_soc",
-            "identificationsociete_iso_cd_isi",
-            "uin_dat_amf",
-            "informationdeposee_inf_tit_inf",
-            "sous_type_d_information",
-            "type_d_information",
-            "url_de_recuperation",
-        ]),
+        "select": ",".join(
+            [
+                "recordid",
+                "identificationsociete_iso_nom_soc",
+                "identificationsociete_iso_cd_isi",
+                "uin_dat_amf",
+                "informationdeposee_inf_tit_inf",
+                "sous_type_d_information",
+                "type_d_information",
+                "url_de_recuperation",
+            ]
+        ),
         "where": where_clause,
     }
 
@@ -255,6 +255,7 @@ def fetch_export_jsonl(
 # ============================================================================
 # Data shaping
 # ============================================================================
+
 
 def build_clean_record(
     record: dict[str, object],
@@ -299,9 +300,10 @@ def extract_data(
     invalid_json_count = 0
     duplicate_record_ids_seen: set[str] = set()
 
-    with open(raw_output_path, "w", encoding="utf-8") as raw_file, \
-         open(clean_output_path, "w", encoding="utf-8") as clean_file:
-
+    with (
+        open(raw_output_path, "w", encoding="utf-8") as raw_file,
+        open(clean_output_path, "w", encoding="utf-8") as clean_file,
+    ):
         for chunk_index, isin_chunk in enumerate(chunked(isins, config.chunk_size), start=1):
             where_clause = build_where_clause(isin_chunk)
             logger.info(
@@ -366,6 +368,7 @@ def extract_data(
 # ============================================================================
 # GCS
 # ============================================================================
+
 
 def ensure_bucket_exists(
     client: storage.Client,
@@ -436,7 +439,10 @@ def dump_gcs(
 # BigQuery
 # ============================================================================
 
-def ensure_dataset_exists(client: bigquery.Client, project_id: str, dataset_id: str, location: str) -> None:
+
+def ensure_dataset_exists(
+    client: bigquery.Client, project_id: str, dataset_id: str, location: str
+) -> None:
     dataset_ref = bigquery.Dataset(f"{project_id}.{dataset_id}")
     dataset_ref.location = location
 
@@ -455,7 +461,7 @@ def ensure_table_exists(client: bigquery.Client, full_table_id: str) -> None:
     except NotFound:
         table = bigquery.Table(full_table_id, schema=BQ_SCHEMA)
         table.time_partitioning = bigquery.TimePartitioning(
-            type_=bigquery.TimePartitioningType.DAY,
+            type_=bigquery.TimePartitioningType.MONTH,
             field="publication_ts",
         )
         table.clustering_fields = ["isin", "record_id"]
@@ -562,6 +568,7 @@ def inject_bq(config: Config, clean_uri: str) -> None:
 # ============================================================================
 # Main
 # ============================================================================
+
 
 def cleanup_local_files(*paths: Path) -> None:
     for path in paths:

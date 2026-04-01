@@ -9,5 +9,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from bronze.rss_google_news import run
 
-referentiel = pd.read_csv(Path(__file__).parent.parent / "referentiel" / "boursorama_peapme_final.csv")
+referentiel = pd.read_csv(
+    Path(__file__).parent.parent / "referentiel" / "boursorama_peapme_final.csv"
+)
 run(referentiel)
