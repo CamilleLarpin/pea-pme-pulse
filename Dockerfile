@@ -20,15 +20,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Copie d'abord les fichiers de dépendances pour tirer parti du cache Docker
-COPY pyproject.toml setup.py setup.cfg requirements.txt ./
+# Copy dependency manifest first for layer caching
+COPY pyproject.toml ./
 
-# Puis le reste du dépôt
+# Copy project source
 COPY . .
 
-RUN python -m pip install --upgrade pip setuptools wheel \
-    && if [ -f requirements.txt ]; then pip install -r requirements.txt; fi \
-    && if [ -f pyproject.toml ] || [ -f setup.py ] || [ -f setup.cfg ]; then pip install -e ".[dev]"; fi
+RUN pip install --upgrade pip \
+    && pip install -e ".[dev]"
 
-# Répertoire de travail par défaut. Ajustez la commande au script d'entrée de votre projet.
-CMD ["python", "-m", "pea_pme_pulse"]
+# Entry point — updated when Prefect deployment is configured
+CMD ["python", "-m", "prefect", "worker", "start", "--pool", "bronze-rss-pool"]
