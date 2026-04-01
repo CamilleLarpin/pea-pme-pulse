@@ -27,6 +27,7 @@ COPY pyproject.toml setup.py setup.cfg requirements.txt ./
 COPY . .
 
 RUN python -m pip install --upgrade pip setuptools wheel \
+    && pip install prefect \
     && if [ -f requirements.txt ]; then pip install -r requirements.txt; fi \
     && if [ -f pyproject.toml ] || [ -f setup.py ] || [ -f setup.cfg ]; then pip install -e ".[dev]"; fi
 
