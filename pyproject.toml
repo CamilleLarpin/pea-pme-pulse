@@ -24,11 +24,14 @@ dev = [
     "pytest",
 ]
 
+<<<<<<< HEAD
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
+=======
+>>>>>>> 95feed232537f8349a00e482c0f3483b680c5267
 
 [tool.ruff]
 line-length = 100
