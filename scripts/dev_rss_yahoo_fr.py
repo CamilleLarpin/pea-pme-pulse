@@ -23,7 +23,7 @@ for i, e in enumerate(entries):
     print(f"[{i:02d}] {e['title']}")
 
 # --- Step 2: match against referentiel ---
-referentiel_path = Path(__file__).parent.parent / "boursorama" / "boursorama_peapme_final.csv"
+referentiel_path = Path(__file__).parent.parent / "referentiel" / "boursorama_peapme_final.csv"
 referentiel = pd.read_csv(referentiel_path)
 
 print(f"\n--- Matching against {len(referentiel)} companies in referentiel ---\n")
