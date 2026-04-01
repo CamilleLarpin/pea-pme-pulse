@@ -28,6 +28,4 @@ deployments:
     work_pool:
       name: bronze-rss-pool
       work_queue_name: default
-      job_variables:
-        env:
-          REFERENTIEL_PATH: /app/referentiel/boursorama_peapme_final.csv
+      job_variables: {}

@@ -1,17 +1,15 @@
 """Prefect flows — Bronze RSS ingestion (Yahoo Finance FR + Google News)."""
 
-import os
 from pathlib import Path
 
 import pandas as pd
 from prefect import flow, get_run_logger
 
-REFERENTIEL_DEFAULT = Path(__file__).parent.parent.parent / "referentiel" / "boursorama_peapme_final.csv"
+REFERENTIEL_PATH = Path(__file__).parent.parent.parent / "referentiel" / "boursorama_peapme_final.csv"
 
 
 def _load_referentiel() -> pd.DataFrame:
-    path = os.environ.get("REFERENTIEL_PATH", str(REFERENTIEL_DEFAULT))
-    return pd.read_csv(path)
+    return pd.read_csv(REFERENTIEL_PATH)
 
 
 @flow(name="bronze-yahoo-rss")
