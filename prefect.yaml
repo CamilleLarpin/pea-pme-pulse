@@ -17,12 +17,12 @@ deployments:
   - name: bronze-rss-daily
     version: "0.1.0"
     tags: ["bronze", "rss"]
-    description: "Daily Bronze RSS ingestion — Yahoo Finance FR + Google News (post-close 18:30 CET)"
+    description: "Daily Bronze RSS ingestion — Yahoo Finance FR + Google News (midnight Paris)"
 
     entrypoint: src/flows/bronze_rss.py:bronze_rss_daily
 
     schedule:
-      cron: "30 17 * * 1-5"   # 17:30 UTC = 18:30 CET (Mon–Fri, post-market close)
+      cron: "0 0 * * *"   # midnight UTC+1/UTC+2 (Paris) — full day's news captured
       timezone: "Europe/Paris"
 
     work_pool:

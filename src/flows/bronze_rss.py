@@ -1,6 +1,12 @@
 """Prefect flows — Bronze RSS ingestion (Yahoo Finance FR + Google News)."""
 
+import sys
 from pathlib import Path
+
+# Ensure src/ is on the path when running directly or via Prefect worker
+_src = Path(__file__).parent.parent
+if str(_src) not in sys.path:
+    sys.path.insert(0, str(_src))
 
 import pandas as pd
 from prefect import flow, get_run_logger
