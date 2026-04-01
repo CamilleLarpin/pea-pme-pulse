@@ -1,7 +1,7 @@
 # Run manuel — pipelines Bronze RSS
 
-> En attendant l'orchestration Prefect, commandes pour lancer les ingestions à la main.
-> Prérequis : être dans le repo local, sur la bonne branche, GCP auth OK.
+> Commandes pour lancer les ingestions manuellement (dev/debug) ou via Prefect (production).
+> Prérequis : être dans le repo local, sur `main`, GCP auth OK.
 
 ---
 
@@ -23,11 +23,9 @@ pyenv which python
 
 ## Yahoo Finance FR RSS
 
-**Branch :** `feature/bronze-yahoo-rss`
 **Output :** GCS `gs://project-pea-pme/rss_yahoo/` · BQ `bronze.yahoo_rss`
 
 ```bash
-git checkout feature/bronze-yahoo-rss
 pyenv exec python scripts/run_yahoo_rss.py
 ```
 
@@ -48,11 +46,9 @@ bq query --nouse_legacy_sql \
 
 ## Google News RSS (Euronext Growth + PME Bourse FR)
 
-**Branch :** `feature/bronze-google-news-rss`
 **Output :** GCS `gs://project-pea-pme/rss_google_news/` · BQ `bronze.google_news_rss`
 
 ```bash
-git checkout feature/bronze-google-news-rss
 pyenv exec python scripts/run_google_news_rss.py
 ```
 
@@ -71,9 +67,30 @@ bq query --nouse_legacy_sql \
 
 ---
 
-## Lancer les deux d'affilée
+## Lancer les deux d'affilée (manuel)
 
 ```bash
-git checkout feature/bronze-yahoo-rss && pyenv exec python scripts/run_yahoo_rss.py
-git checkout feature/bronze-google-news-rss && pyenv exec python scripts/run_google_news_rss.py
+pyenv exec python scripts/run_yahoo_rss.py
+pyenv exec python scripts/run_google_news_rss.py
+```
+
+---
+
+## Via Prefect (production)
+
+Flows déployés sous le work pool `bronze-rss-pool` · schedule automatique 17:30 UTC lun–ven.
+
+**Lancer manuellement un run Prefect :**
+```bash
+prefect deployment run 'bronze-rss-daily/bronze-rss-daily'
+```
+
+**Voir les runs récents :**
+```bash
+prefect flow-run ls
+```
+
+**Démarrer le worker (sur GCP e2-small) :**
+```bash
+prefect worker start --pool bronze-rss-pool
 ```

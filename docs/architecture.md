@@ -6,12 +6,14 @@
 src/
 ├── bronze/       # ingestion — one module per source (incl. boursorama)
 ├── silver/       # cleaning/parsing
-└── gold/         # scoring & ranking
+├── gold/         # scoring & ranking
+└── flows/        # Prefect flow definitions — one file per milestone/layer
 referentiel/      # static reference data files (CSV) — companies list used to match/join across sources
 dbt/              # SQL transformation models running on BigQuery (Silver/Gold logic)
 scripts/          # one-off dev/exploration scripts — never imported by pipeline code
 tests/            # unit and integration tests — mirrors src/ structure (tests/bronze/, tests/silver/, tests/gold/)
 docs/             # this folder
+prefect.yaml      # Prefect deployment config
 ```
 
 Pipeline code lives under `src/` · tooling and data files at root level.
@@ -46,9 +48,31 @@ GCS stores raw data that cannot be re-fetched. Two rules:
 
 ```
 gs://project_bucket/
-├── rss_yahoo/    # raw feed dumps, timestamped
+├── rss_yahoo/         # raw feed dumps, timestamped
+├── rss_google_news/   # raw feed dumps, timestamped
 ├── rss_abcbourse/
-└── amf/          # AMF PDFs/XMLs/jsonl
+└── amf/               # AMF PDFs/XMLs/jsonl
+```
+
+---
+
+## Orchestration — Prefect
+
+Flows live under `src/flows/` · deployment config in `prefect.yaml`.
+
+| Flow | File | Schedule |
+|---|---|---|
+| `bronze-yahoo-rss` | `src/flows/bronze_rss.py` | called by orchestrator |
+| `bronze-google-news-rss` | `src/flows/bronze_rss.py` | called by orchestrator |
+| `bronze-rss-daily` | `src/flows/bronze_rss.py` | cron `30 17 * * 1-5` (17:30 UTC = 18:30 CET, Mon–Fri) |
+
+Work pool: `bronze-rss-pool` (process type) · target: GCP e2-small
+
+Deploy:
+```bash
+prefect work-pool create bronze-rss-pool --type process
+prefect deploy --name bronze-rss-daily
+prefect worker start --pool bronze-rss-pool   # on GCP e2-small
 ```
 
 ---
