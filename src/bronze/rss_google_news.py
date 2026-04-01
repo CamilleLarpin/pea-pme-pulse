@@ -12,12 +12,10 @@ from rapidfuzz import fuzz, process
 
 FEED_URLS = {
     "euronext_growth": (
-        "https://news.google.com/rss/search"
-        "?q=Euronext+Growth+France&hl=fr&gl=FR&ceid=FR:fr"
+        "https://news.google.com/rss/search?q=Euronext+Growth+France&hl=fr&gl=FR&ceid=FR:fr"
     ),
     "pme_bourse_fr": (
-        "https://news.google.com/rss/search"
-        "?q=bourse+PME+France+small+cap&hl=fr&gl=FR&ceid=FR:fr"
+        "https://news.google.com/rss/search?q=bourse+PME+France+small+cap&hl=fr&gl=FR&ceid=FR:fr"
     ),
 }
 
@@ -139,21 +137,25 @@ def match_companies(entries: list[dict], referentiel: pd.DataFrame) -> pd.DataFr
         if best_match:
             matched_name, score, _ = best_match
             ref_row = referentiel[referentiel["name"] == matched_name].iloc[0]
-            rows.append({
-                **entry,
-                "matched_name": matched_name,
-                "match_score": score,
-                "isin": ref_row["isin"],
-                "ticker_bourso": ref_row["ticker_bourso"],
-            })
+            rows.append(
+                {
+                    **entry,
+                    "matched_name": matched_name,
+                    "match_score": score,
+                    "isin": ref_row["isin"],
+                    "ticker_bourso": ref_row["ticker_bourso"],
+                }
+            )
         else:
-            rows.append({
-                **entry,
-                "matched_name": None,
-                "match_score": None,
-                "isin": None,
-                "ticker_bourso": None,
-            })
+            rows.append(
+                {
+                    **entry,
+                    "matched_name": None,
+                    "match_score": None,
+                    "isin": None,
+                    "ticker_bourso": None,
+                }
+            )
     return pd.DataFrame(rows)
 
 
