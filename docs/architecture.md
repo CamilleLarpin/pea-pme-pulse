@@ -16,8 +16,6 @@ docs/             # this folder
 
 Pipeline code lives under `src/` · tooling and data files at root level.
 
-> Note: `boursorama/` at root is temporary — the Boursorama scraper should move to `src/bronze/boursorama.py` to follow this layout.
-
 ---
 
 ## BigQuery — medallion datasets
@@ -55,19 +53,36 @@ gs://project_bucket/
 
 ---
 
-## Environment variable naming - TBD
+## Environment variables
 
-| Variable | Example value |
-|---|---|
-| `GCP_PROJECT_ID` | `bootcamp-project-pea-pme` |
-| `GCS_BUCKET_NAME` | `project-pea-pme` |
+| Variable | Example value | Description |
+|---|---|---|
+| `GCP_PROJECT_ID` | `bootcamp-project-pea-pme` | GCP project |
+| `GCS_BUCKET_NAME` | `project-pea-pme` | GCS bucket for raw dumps |
+| `REFERENTIEL_PATH` | `referentiel/companies_draft.csv` | Override referentiel CSV · defaults to full referentiel (569 companies) · set to draft (5 companies) for local dev |
 
 
 ---
 
 ## Referentiel
 
-Master referentiel: `boursorama/boursorama_peapme_final.csv` (569 companies)
+Master referentiel: `referentiel/boursorama_peapme_final.csv` (569 companies)
 Key columns: `name`, `ticker_bourso`, `isin`
 
 Draft (5 companies for testing): `referentiel/companies_draft.csv`
+
+---
+
+## Conventions
+
+### Logging
+Use `loguru` across all pipeline modules (`src/`). Do not use `print()`.
+
+```python
+from loguru import logger
+
+logger.info("BQ load: {} rows → {}", len(df), table_id)
+logger.warning("No match found for ISIN: {}", isin)
+```
+
+`loguru` outputs structured logs with timestamps and levels — required for observability in production (Prefect on GCP).
