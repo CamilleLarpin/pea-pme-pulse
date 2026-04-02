@@ -1,0 +1,18 @@
+# Copy this file to ~/.dbt/profiles.yml and adjust if needed.
+# Never commit profiles.yml — it contains local credentials.
+#
+# Prerequisites:
+#   pip install dbt-bigquery
+#   gcloud auth application-default login
+
+pea_pme_pulse:
+  target: dev
+  outputs:
+    dev:
+      type: bigquery
+      method: oauth
+      project: bootcamp-project-pea-pme
+      dataset: silver        # default dataset — model +schema overrides apply per layer
+      threads: 4
+      timeout_seconds: 300
+      location: EU           # match your BQ dataset region

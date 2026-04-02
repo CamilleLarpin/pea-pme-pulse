@@ -1,0 +1,21 @@
+name: pea_pme_pulse
+version: '1.0.0'
+config-version: 2
+
+profile: pea_pme_pulse
+
+model-paths: ["models"]
+test-paths: ["tests"]
+macro-paths: ["macros"]
+
+target-path: "target"
+clean-targets: ["target", "dbt_packages"]
+
+models:
+  pea_pme_pulse:
+    silver:
+      +materialized: table
+      +schema: silver
+    gold:
+      +materialized: table
+      +schema: gold

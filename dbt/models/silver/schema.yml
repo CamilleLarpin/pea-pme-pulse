@@ -1,0 +1,31 @@
+version: 2
+
+models:
+  - name: rss_articles
+    description: >
+      Unified silver RSS articles from all sources (Yahoo Finance FR, Google News).
+      Deduplicated by (title, isin). Only company-matched rows (isin not null).
+    columns:
+      - name: isin
+        description: "ISIN of the matched PEA-PME company"
+        tests:
+          - not_null
+      - name: title
+        description: "Article title (original, not cleaned)"
+        tests:
+          - not_null
+      - name: source
+        description: "Origin RSS feed: yahoo_rss | google_news_rss"
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['yahoo_rss', 'google_news_rss']
+      - name: published_at
+        description: "Parsed publish timestamp (UTC) — null if unparseable"
+      - name: matched_name
+        description: "Company name from referentiel that was fuzzy-matched"
+      - name: match_score
+        description: "Fuzzy match confidence score (0–100)"
+      - name: ticker_bourso
+        description: "Boursorama ticker of the matched company"
