@@ -28,6 +28,7 @@ def yfinance_ohlcv_ingest() -> dict:
     - Écriture dans BigQuery en mode APPEND
     """
     from bronze.yahoo_ohlcv_bronze import run
+
     return run()
 
 
@@ -38,7 +39,10 @@ def yfinance_ohlcv_flow() -> None:
     stats = yfinance_ohlcv_ingest()
     logger.info(
         "Flow terminé — %d succès, %d skippés, %d échecs (total %d)",
-        stats["success"], stats["skipped"], stats["failed"], stats["total"],
+        stats["success"],
+        stats["skipped"],
+        stats["failed"],
+        stats["total"],
     )
 
 

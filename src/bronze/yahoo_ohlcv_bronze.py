@@ -36,12 +36,12 @@ from loguru import logger
 ROOT = Path(__file__).parents[2]
 
 REFERENTIEL_PATH = ROOT / "referentiel" / "boursorama_peapme_final.csv"
-OVERRIDES_PATH   = ROOT / "referentiel" / "ticker_overrides.json"
+OVERRIDES_PATH = ROOT / "referentiel" / "ticker_overrides.json"
 
 GCP_PROJECT_ID = "bootcamp-project-pea-pme"
-BQ_DATASET     = "bronze"
-BQ_TABLE       = "yfinance_ohlcv"
-BQ_TABLE_REF   = f"{GCP_PROJECT_ID}.{BQ_DATASET}.{BQ_TABLE}"
+BQ_DATASET = "bronze"
+BQ_TABLE = "yfinance_ohlcv"
+BQ_TABLE_REF = f"{GCP_PROJECT_ID}.{BQ_DATASET}.{BQ_TABLE}"
 
 HISTORY_PERIOD = "max"
 
@@ -53,17 +53,17 @@ SLEEP_BETWEEN_CALLS = 0.5
 # Schéma BQ explicite — garantit DATE et TIMESTAMP corrects
 # sans dépendre de l'autodetect (qui peut mal interpréter les date objects pandas)
 BRONZE_SCHEMA = [
-    bigquery.SchemaField("Date",          "DATE"),
-    bigquery.SchemaField("Open",          "FLOAT"),
-    bigquery.SchemaField("High",          "FLOAT"),
-    bigquery.SchemaField("Low",           "FLOAT"),
-    bigquery.SchemaField("Close",         "FLOAT"),
-    bigquery.SchemaField("Volume",        "INTEGER"),
-    bigquery.SchemaField("Dividends",     "FLOAT"),
-    bigquery.SchemaField("Stock Splits",  "FLOAT"),
-    bigquery.SchemaField("isin",          "STRING"),
-    bigquery.SchemaField("yf_ticker",     "STRING"),
-    bigquery.SchemaField("ingested_at",   "TIMESTAMP"),
+    bigquery.SchemaField("Date", "DATE"),
+    bigquery.SchemaField("Open", "FLOAT"),
+    bigquery.SchemaField("High", "FLOAT"),
+    bigquery.SchemaField("Low", "FLOAT"),
+    bigquery.SchemaField("Close", "FLOAT"),
+    bigquery.SchemaField("Volume", "INTEGER"),
+    bigquery.SchemaField("Dividends", "FLOAT"),
+    bigquery.SchemaField("Stock Splits", "FLOAT"),
+    bigquery.SchemaField("isin", "STRING"),
+    bigquery.SchemaField("yf_ticker", "STRING"),
+    bigquery.SchemaField("ingested_at", "TIMESTAMP"),
 ]
 
 # ---------------------------------------------------------------------------
@@ -75,6 +75,7 @@ BRONZE_SCHEMA = [
 # ---------------------------------------------------------------------------
 # Fonctions
 # ---------------------------------------------------------------------------
+
 
 def load_referentiel(path: Path) -> pd.DataFrame:
     """
@@ -99,11 +100,10 @@ def load_referentiel(path: Path) -> pd.DataFrame:
 
     before = len(df)
     df = df.drop_duplicates(subset=["isin"])
-    after  = len(df)
+    after = len(df)
 
     logger.info(
-        f"Référentiel : {after} entreprises uniques "
-        f"({before - after} doublons ISIN retirés)"
+        f"Référentiel : {after} entreprises uniques ({before - after} doublons ISIN retirés)"
     )
     return df.reset_index(drop=True)
 
@@ -198,8 +198,8 @@ def fetch_ohlcv(isin: str, yf_ticker: str, start_date: date | None = None) -> pd
         # BQ stockera le type DATE (ex: 2024-01-15) au lieu de DATETIME.
         df["Date"] = df["Date"].dt.date
 
-        df["isin"]        = isin
-        df["yf_ticker"]   = yf_ticker
+        df["isin"] = isin
+        df["yf_ticker"] = yf_ticker
         df["ingested_at"] = datetime.now(UTC)
 
         return df
@@ -228,7 +228,7 @@ def get_last_dates(client: bigquery.Client) -> dict[str, date]:
     query = f"SELECT isin, MAX(Date) as last_date FROM `{BQ_TABLE_REF}` GROUP BY isin"
     try:
         result = client.query(query).result()
-        dates  = {row["isin"]: row["last_date"] for row in result}
+        dates = {row["isin"]: row["last_date"] for row in result}
         logger.info(f"BQ : {len(dates)} ISIN déjà présents")
         return dates
     except Exception:
@@ -256,15 +256,16 @@ def write_to_bigquery(client: bigquery.Client, df: pd.DataFrame) -> None:
 # Orchestration
 # ---------------------------------------------------------------------------
 
+
 def run() -> dict:
     logger.info("=== Démarrage pipeline Bronze OHLCV ===")
     logger.info(f"Historique : {HISTORY_PERIOD} | Destination : {BQ_TABLE_REF}")
 
     client = bigquery.Client(project=GCP_PROJECT_ID)
 
-    df_ref     = load_referentiel(REFERENTIEL_PATH)
+    df_ref = load_referentiel(REFERENTIEL_PATH)
     last_dates = get_last_dates(client)
-    overrides  = load_overrides(OVERRIDES_PATH)
+    overrides = load_overrides(OVERRIDES_PATH)
 
     success, skipped, failed = [], [], []
     total = len(df_ref)
@@ -273,7 +274,7 @@ def run() -> dict:
         isin = row["isin"]
         name = row["name"]
 
-        logger.info(f"[{i+1}/{total}] {name} ({isin})")
+        logger.info(f"[{i + 1}/{total}] {name} ({isin})")
 
         # Résolution ticker
         yf_ticker = isin_to_yf_ticker(isin, overrides)
@@ -288,7 +289,9 @@ def run() -> dict:
         # Idempotence incrémentale : ne fetch que les lignes nouvelles
         start_date = last_dates.get(isin)
         if start_date:
-            logger.info(f"  → dernière date en BQ : {start_date} — fetch depuis {start_date + timedelta(days=1)}")
+            logger.info(
+                f"  → dernière date en BQ : {start_date} — fetch depuis {start_date + timedelta(days=1)}"
+            )
 
         # Téléchargement OHLCV
         df_ohlcv = fetch_ohlcv(isin, yf_ticker, start_date=start_date)
@@ -315,7 +318,9 @@ def run() -> dict:
         # Écriture BQ
         try:
             write_to_bigquery(client, df_ohlcv)
-            logger.info(f"  → {len(df_ohlcv)} lignes écrites ({df_ohlcv['Date'].min()} → {df_ohlcv['Date'].max()})")
+            logger.info(
+                f"  → {len(df_ohlcv)} lignes écrites ({df_ohlcv['Date'].min()} → {df_ohlcv['Date'].max()})"
+            )
             success.append(isin)
         except Exception as e:
             logger.error(f"  → Erreur écriture BQ : {e}")
