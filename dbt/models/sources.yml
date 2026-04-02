@@ -1,0 +1,30 @@
+version: 2
+
+sources:
+  - name: bronze
+    database: bootcamp-project-pea-pme
+    schema: bronze
+    tables:
+      - name: yahoo_rss
+        description: "Raw matched Yahoo Finance FR RSS articles — fetched daily"
+      - name: google_news_rss
+        description: "Raw matched Google News RSS articles — fetched daily"
+      - name: yfinance_ohlcv
+        description: "Raw daily OHLCV data from Yahoo Finance — all PEA-PME ISINs"
+        columns:
+          - name: isin
+            description: "ISIN de la société PEA-PME"
+            tests:
+              - not_null
+          - name: Date
+            description: "Date de cotation (DATE)"
+            tests:
+              - not_null
+          - name: Close
+            description: "Prix de clôture"
+            tests:
+              - not_null
+          - name: yf_ticker
+            description: "Ticker Yahoo Finance utilisé pour l'ingestion"
+          - name: ingested_at
+            description: "Timestamp UTC d'ingestion (TIMESTAMP)"
