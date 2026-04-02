@@ -3,7 +3,8 @@
 import pandas as pd
 import pytest
 
-from bronze.rss_google_news import fetch_all_feeds, match_companies, _clean_title
+from bronze.fuzzy_match import clean_title, match_companies
+from bronze.rss_google_news import fetch_all_feeds
 
 REFERENTIEL = pd.DataFrame([
     {"ticker_bourso": "1rPTHEP", "name": "THERMADOR", "isin": "FR0013333432"},
@@ -94,9 +95,9 @@ def test_short_name_exact_match():
 
 
 def test_clean_title_strips_source_suffix():
-    assert _clean_title("THERMADOR annonce ses résultats - lefigaro.fr") == "THERMADOR annonce ses résultats"
-    assert _clean_title("Hexaom prévoit une hausse - Ouest-France") == "Hexaom prévoit une hausse - Ouest-France"  # no domain, unchanged
-    assert _clean_title("NFL Biosciences s'introduit en bourse - euronext.com") == "NFL Biosciences s'introduit en bourse"
+    assert clean_title("THERMADOR annonce ses résultats - lefigaro.fr") == "THERMADOR annonce ses résultats"
+    assert clean_title("Hexaom prévoit une hausse - Ouest-France") == "Hexaom prévoit une hausse - Ouest-France"  # no domain, unchanged
+    assert clean_title("NFL Biosciences s'introduit en bourse - euronext.com") == "NFL Biosciences s'introduit en bourse"
 
 
 def test_blocklisted_name_not_matched():

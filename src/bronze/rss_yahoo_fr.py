@@ -1,4 +1,4 @@
-"""Bronze ingestion — Google News RSS (Euronext Growth + PME Bourse FR)."""
+"""Bronze ingestion — Yahoo Finance FR RSS."""
 
 import json
 from datetime import datetime, timezone
@@ -10,32 +10,23 @@ from loguru import logger
 
 from bronze.fuzzy_match import match_companies
 
-FEED_URLS = {
-    "euronext_growth": (
-        "https://news.google.com/rss/search"
-        "?q=Euronext+Growth+France&hl=fr&gl=FR&ceid=FR:fr"
-    ),
-    "pme_bourse_fr": (
-        "https://news.google.com/rss/search"
-        "?q=bourse+PME+France+small+cap&hl=fr&gl=FR&ceid=FR:fr"
-    ),
-}
+# TODO: verify exact URL with team before production
+FEED_URL = "https://fr.finance.yahoo.com/news/rssindex"
 
 BQ_PROJECT = "bootcamp-project-pea-pme"
 BQ_DATASET = "bronze"
-BQ_TABLE = "google_news_rss"
+BQ_TABLE = "yahoo_rss"
 
 GCS_BUCKET = "project-pea-pme"
-GCS_PREFIX = "rss_google_news"
+GCS_PREFIX = "rss_yahoo"
 
 
-def fetch_feed(feed_name: str, url: str) -> list[dict]:
-    """Fetch a single Google News RSS feed and return raw entries."""
+def fetch_feed(url: str = FEED_URL) -> list[dict]:
+    """Fetch Yahoo Finance FR RSS and return raw entries."""
     feed = feedparser.parse(url)
     fetched_at = datetime.now(timezone.utc).isoformat()
     return [
         {
-            "feed_name": feed_name,
             "title": entry.get("title", ""),
             "link": entry.get("link", ""),
             "published": entry.get("published", ""),
@@ -44,18 +35,6 @@ def fetch_feed(feed_name: str, url: str) -> list[dict]:
         }
         for entry in feed.entries
     ]
-
-
-def fetch_all_feeds(urls: dict[str, str] = FEED_URLS) -> list[dict]:
-    """Fetch all configured Google News RSS feeds and deduplicate by title."""
-    all_entries = []
-    seen_titles = set()
-    for feed_name, url in urls.items():
-        for entry in fetch_feed(feed_name, url):
-            if entry["title"] not in seen_titles:
-                seen_titles.add(entry["title"])
-                all_entries.append(entry)
-    return all_entries
 
 
 def dump_to_gcs(entries: list[dict]) -> None:
@@ -75,7 +54,7 @@ def dump_to_gcs(entries: list[dict]) -> None:
 
 
 def write_to_bigquery(df: pd.DataFrame) -> None:
-    """Write matched records to BigQuery bronze.google_news_rss."""
+    """Write matched records to BigQuery bronze.yahoo_rss."""
     client = bigquery.Client(project=BQ_PROJECT)
     table_id = f"{BQ_PROJECT}.{BQ_DATASET}.{BQ_TABLE}"
     job = client.load_table_from_dataframe(df, table_id)
@@ -84,8 +63,8 @@ def write_to_bigquery(df: pd.DataFrame) -> None:
 
 
 def run(referentiel: pd.DataFrame) -> pd.DataFrame:
-    """Fetch, dump to GCS, match, and load Google News RSS entries."""
-    entries = fetch_all_feeds()
+    """Fetch, dump to GCS, match, and load Yahoo Finance FR RSS entries."""
+    entries = fetch_feed()
     dump_to_gcs(entries)
     df = match_companies(entries, referentiel)
     matched = df[df["isin"].notna()]
