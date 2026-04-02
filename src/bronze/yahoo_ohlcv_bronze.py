@@ -3,7 +3,7 @@
 # Pipeline Bronze — OHLCV PEA-PME
 # Source      : Yahoo Finance (via yfinance)
 # Référentiel : referentiel/boursorama_peapme_final.csv
-# Destination : BigQuery → dataset bronze, table yahoo_ohlcv
+# Destination : BigQuery → dataset bronze, table yfinance_ohlcv
 #
 # Architecture Bronze/Silver :
 #   Bronze (ce script) = données brutes OHLCV sans transformation
@@ -14,50 +14,63 @@
 #   boursorama_peapme_final.csv
 #       → load_referentiel()        (nettoyage + déduplication ISIN)
 #       → load_overrides()          (overrides manuels ISIN → ticker)
+#       → get_last_dates()          (dernière date ingérée par ISIN — idempotence)
 #       → isin_to_yf_ticker()       (résolution ISIN → ticker Yahoo)
-#       → fetch_ohlcv()             (téléchargement historique complet)
+#       → fetch_ohlcv()             (historique complet ou incrémental selon last_date)
 #       → write_to_bigquery()       (écriture directe BQ, sans fichier local)
 
 import json
 import time
-import logging
 from pathlib import Path
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 import pandas as pd
 import yfinance as yf
 from google.cloud import bigquery
+from loguru import logger
 
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
 
-ROOT = Path(__file__).parents[3]
+ROOT = Path(__file__).parents[2]
 
 REFERENTIEL_PATH = ROOT / "referentiel" / "boursorama_peapme_final.csv"
 OVERRIDES_PATH   = ROOT / "referentiel" / "ticker_overrides.json"
 
 GCP_PROJECT_ID = "bootcamp-project-pea-pme"
 BQ_DATASET     = "bronze"
-BQ_TABLE       = "yahoo_ohlcv"
+BQ_TABLE       = "yfinance_ohlcv"
 BQ_TABLE_REF   = f"{GCP_PROJECT_ID}.{BQ_DATASET}.{BQ_TABLE}"
 
 HISTORY_PERIOD = "max"
 
 # Pause entre chaque appel Yahoo pour éviter le rate-limiting
-# yfinance ne publie pas de limite officielle — 1s est conservateur et suffisant
-SLEEP_BETWEEN_CALLS = 1.0
+# yfinance ne publie pas de limite officielle — 0.5s est un compromis
+# sûr pour 459 ISINs. Remonter à 1.0 si des erreurs 429 apparaissent.
+SLEEP_BETWEEN_CALLS = 0.5
+
+# Schéma BQ explicite — garantit DATE et TIMESTAMP corrects
+# sans dépendre de l'autodetect (qui peut mal interpréter les date objects pandas)
+BRONZE_SCHEMA = [
+    bigquery.SchemaField("Date",          "DATE"),
+    bigquery.SchemaField("Open",          "FLOAT"),
+    bigquery.SchemaField("High",          "FLOAT"),
+    bigquery.SchemaField("Low",           "FLOAT"),
+    bigquery.SchemaField("Close",         "FLOAT"),
+    bigquery.SchemaField("Volume",        "INTEGER"),
+    bigquery.SchemaField("Dividends",     "FLOAT"),
+    bigquery.SchemaField("Stock Splits",  "FLOAT"),
+    bigquery.SchemaField("isin",          "STRING"),
+    bigquery.SchemaField("yf_ticker",     "STRING"),
+    bigquery.SchemaField("ingested_at",   "TIMESTAMP"),
+]
 
 # ---------------------------------------------------------------------------
 # Logging
 # ---------------------------------------------------------------------------
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s | %(levelname)s | %(message)s",
-    datefmt="%Y-%m-%dT%H:%M:%S",
-)
-log = logging.getLogger(__name__)
+# loguru : pas de configuration nécessaire — format et niveau INFO par défaut
 
 # ---------------------------------------------------------------------------
 # Fonctions
@@ -88,7 +101,7 @@ def load_referentiel(path: Path) -> pd.DataFrame:
     df = df.drop_duplicates(subset=["isin"])
     after  = len(df)
 
-    log.info(
+    logger.info(
         f"Référentiel : {after} entreprises uniques "
         f"({before - after} doublons ISIN retirés)"
     )
@@ -111,11 +124,11 @@ def load_overrides(path: Path) -> dict:
     }
     """
     if not path.exists():
-        log.info("Pas de fichier ticker_overrides.json — aucun override actif")
+        logger.info("Pas de fichier ticker_overrides.json — aucun override actif")
         return {}
     with open(path) as f:
         overrides = json.load(f)
-    log.info(f"Overrides chargés : {len(overrides)} entrée(s)")
+    logger.info(f"Overrides chargés : {len(overrides)} entrée(s)")
     return overrides
 
 
@@ -133,7 +146,7 @@ def isin_to_yf_ticker(isin: str, overrides: dict) -> str | None:
     """
     # 1. Override manuel
     if isin in overrides:
-        log.info(f"  → override manuel : {overrides[isin]}")
+        logger.info(f"  → override manuel : {overrides[isin]}")
         return overrides[isin]
 
     # 2. Résolution automatique Yahoo
@@ -141,19 +154,24 @@ def isin_to_yf_ticker(isin: str, overrides: dict) -> str | None:
         info = yf.Ticker(isin).info
         return info.get("symbol") or None
     except Exception as e:
-        log.debug(f"Erreur résolution ISIN {isin} : {e}")
+        logger.warning(f"Erreur résolution ISIN {isin} : {e}")
         return None
 
 
-def fetch_ohlcv(isin: str, yf_ticker: str) -> pd.DataFrame | None:
+def fetch_ohlcv(isin: str, yf_ticker: str, start_date: date | None = None) -> pd.DataFrame | None:
     """
-    Télécharge l'historique OHLCV complet depuis Yahoo Finance.
+    Télécharge l'historique OHLCV depuis Yahoo Finance.
 
-    period="max" : tout l'historique disponible pour ce ticker.
-    Nécessaire pour garantir le warmup des indicateurs Silver :
-    - EMA_50      : 50 jours minimum
-    - MACD_signal : 33 jours minimum
-    - RSI_14      : 14 jours minimum
+    Première ingestion (start_date=None) :
+      period="max" → tout l'historique disponible.
+      Nécessaire pour le warmup des indicateurs Silver :
+      - SMA_200     : 200 jours minimum
+      - MACD_signal : 34 jours minimum
+      - RSI_14      : 14 jours minimum
+
+    Runs quotidiens Prefect (start_date fourni) :
+      start=last_date+1 → uniquement les nouvelles lignes.
+      Retourne None si aucune nouvelle donnée (ISIN déjà à jour).
 
     Colonnes retournées par yfinance :
       Open, High, Low, Close, Volume, Dividends, Stock Splits
@@ -164,62 +182,71 @@ def fetch_ohlcv(isin: str, yf_ticker: str) -> pd.DataFrame | None:
       ingested_at → timestamp UTC d'ingestion (traçabilité Bronze)
     """
     try:
-        df = yf.Ticker(yf_ticker).history(period=HISTORY_PERIOD)
+        if start_date is None:
+            df = yf.Ticker(yf_ticker).history(period=HISTORY_PERIOD)
+        else:
+            fetch_from = start_date + timedelta(days=1)
+            df = yf.Ticker(yf_ticker).history(start=fetch_from)
 
         if df.empty:
             return None
 
         df = df.reset_index()
 
-        # Suppression du timezone : BQ attend DATETIME sans tz info
-        # Le timezone Europe/Paris est implicitement conservé dans les valeurs
-        df["Date"] = df["Date"].dt.tz_localize(None)
+        # Conversion en DATE pure : la granularité est journalière,
+        # l'heure retournée par yfinance est toujours 00:00:00 → inutile.
+        # BQ stockera le type DATE (ex: 2024-01-15) au lieu de DATETIME.
+        df["Date"] = df["Date"].dt.date
 
         df["isin"]        = isin
         df["yf_ticker"]   = yf_ticker
-        df["ingested_at"] = datetime.now(timezone.utc).replace(tzinfo=None)
+        df["ingested_at"] = datetime.now(timezone.utc)
 
         return df
 
     except Exception as e:
-        log.debug(f"Erreur fetch OHLCV {yf_ticker} ({isin}) : {e}")
+        logger.warning(f"Erreur fetch OHLCV {yf_ticker} ({isin}) : {e}")
         return None
 
 
-def get_already_ingested_isins(client: bigquery.Client) -> set[str]:
+def get_last_dates(client: bigquery.Client) -> dict[str, date]:
     """
-    Récupère les ISIN déjà présents dans BQ pour l'idempotence.
+    Récupère la dernière date ingérée par ISIN depuis BQ.
 
-    Permet de relancer le script après un crash sans re-télécharger
-    les entreprises déjà ingérées.
+    Utilisé pour l'idempotence incrémentale : au lieu de skipper
+    un ISIN entier (ancienne logique), on ne télécharge que les
+    lignes postérieures à la dernière date connue.
+
+    Avantage vs l'ancienne approche "ISIN présent → skip" :
+    - Les runs quotidiens Prefect n'ajoutent que les nouvelles lignes
+    - Un crash partiel est récupérable : le prochain run repart
+      de la dernière date complète
 
     Si la table n'existe pas encore (première exécution), retourne
-    un set vide sans lever d'erreur.
+    un dict vide sans lever d'erreur.
     """
-    query = f"SELECT DISTINCT isin FROM `{BQ_TABLE_REF}`"
+    query = f"SELECT isin, MAX(Date) as last_date FROM `{BQ_TABLE_REF}` GROUP BY isin"
     try:
         result = client.query(query).result()
-        isins  = {row["isin"] for row in result}
-        log.info(f"BQ : {len(isins)} ISIN déjà présents")
-        return isins
+        dates  = {row["isin"]: row["last_date"] for row in result}
+        logger.info(f"BQ : {len(dates)} ISIN déjà présents")
+        return dates
     except Exception:
-        log.info(f"Table {BQ_TABLE_REF} absente → première ingestion")
-        return set()
+        logger.info(f"Table {BQ_TABLE_REF} absente → première ingestion")
+        return {}
 
 
 def write_to_bigquery(client: bigquery.Client, df: pd.DataFrame) -> None:
     """
     Écrit un DataFrame dans BigQuery en mode APPEND.
 
-    WRITE_APPEND : ajoute sans écraser — mode standard pour Bronze
-    qui accumule les données dans le temps.
-
-    autodetect=True : BQ infère les types depuis le DataFrame.
-    Acceptable en Bronze. En Silver on définira un schéma explicite.
+    WRITE_APPEND : ajoute sans écraser — Bronze accumule les données dans le temps.
+    Schéma explicite pour garantir DATE et TIMESTAMP corrects (vs autodetect
+    qui peut mal interpréter les date objects Python stockés en object dtype pandas).
     """
     job_config = bigquery.LoadJobConfig(
         write_disposition=bigquery.WriteDisposition.WRITE_APPEND,
-        autodetect=True,
+        schema=BRONZE_SCHEMA,
     )
     job = client.load_table_from_dataframe(df, BQ_TABLE_REF, job_config=job_config)
     job.result()  # bloquant — attend confirmation avant de passer au suivant
@@ -230,14 +257,14 @@ def write_to_bigquery(client: bigquery.Client, df: pd.DataFrame) -> None:
 # ---------------------------------------------------------------------------
 
 def run() -> None:
-    log.info("=== Démarrage pipeline Bronze OHLCV ===")
-    log.info(f"Historique : {HISTORY_PERIOD} | Destination : {BQ_TABLE_REF}")
+    logger.info("=== Démarrage pipeline Bronze OHLCV ===")
+    logger.info(f"Historique : {HISTORY_PERIOD} | Destination : {BQ_TABLE_REF}")
 
     client = bigquery.Client(project=GCP_PROJECT_ID)
 
-    df_ref       = load_referentiel(REFERENTIEL_PATH)
-    already_done = get_already_ingested_isins(client)
-    overrides    = load_overrides(OVERRIDES_PATH)
+    df_ref     = load_referentiel(REFERENTIEL_PATH)
+    last_dates = get_last_dates(client)
+    overrides  = load_overrides(OVERRIDES_PATH)
 
     success, skipped, failed = [], [], []
     total = len(df_ref)
@@ -246,53 +273,56 @@ def run() -> None:
         isin = row["isin"]
         name = row["name"]
 
-        log.info(f"[{i+1}/{total}] {name} ({isin})")
-
-        # Idempotence
-        if isin in already_done:
-            log.info("  → déjà ingéré, skip")
-            skipped.append(isin)
-            continue
+        logger.info(f"[{i+1}/{total}] {name} ({isin})")
 
         # Résolution ticker
         yf_ticker = isin_to_yf_ticker(isin, overrides)
         if not yf_ticker:
-            log.warning("  → ticker Yahoo introuvable")
+            logger.warning("  → ticker Yahoo introuvable")
             failed.append(isin)
             time.sleep(SLEEP_BETWEEN_CALLS)
             continue
 
-        log.info(f"  → ticker Yahoo : {yf_ticker}")
+        logger.info(f"  → ticker Yahoo : {yf_ticker}")
+
+        # Idempotence incrémentale : ne fetch que les lignes nouvelles
+        start_date = last_dates.get(isin)
+        if start_date:
+            logger.info(f"  → dernière date en BQ : {start_date} — fetch depuis {start_date + timedelta(days=1)}")
 
         # Téléchargement OHLCV
-        df_ohlcv = fetch_ohlcv(isin, yf_ticker)
+        df_ohlcv = fetch_ohlcv(isin, yf_ticker, start_date=start_date)
         if df_ohlcv is None:
-            log.warning("  → OHLCV vide")
-            failed.append(isin)
+            if start_date is not None:
+                logger.info("  → déjà à jour, skip")
+                skipped.append(isin)
+            else:
+                logger.warning("  → OHLCV vide")
+                failed.append(isin)
             time.sleep(SLEEP_BETWEEN_CALLS)
             continue
 
         # Écriture BQ
         try:
             write_to_bigquery(client, df_ohlcv)
-            log.info(f"  → {len(df_ohlcv)} lignes écrites ({df_ohlcv['Date'].min().date()} → {df_ohlcv['Date'].max().date()})")
+            logger.info(f"  → {len(df_ohlcv)} lignes écrites ({df_ohlcv['Date'].min()} → {df_ohlcv['Date'].max()})")
             success.append(isin)
         except Exception as e:
-            log.error(f"  → Erreur écriture BQ : {e}")
+            logger.error(f"  → Erreur écriture BQ : {e}")
             failed.append(isin)
 
         time.sleep(SLEEP_BETWEEN_CALLS)
 
     # Bilan
-    log.info("=" * 60)
-    log.info(f"✅ Succès  : {len(success)}/{total}")
-    log.info(f"⏭️  Skippés : {len(skipped)}/{total}")
-    log.info(f"❌ Échecs  : {len(failed)}/{total}")
+    logger.info("=" * 60)
+    logger.info(f"✅ Succès  : {len(success)}/{total}")
+    logger.info(f"⏭️  Skippés : {len(skipped)}/{total}")
+    logger.info(f"❌ Échecs  : {len(failed)}/{total}")
     if failed:
-        log.warning("ISIN en échec :")
+        logger.warning("ISIN en échec :")
         for isin in failed:
-            log.warning(f"  - {isin}")
-    log.info("=== Pipeline terminé ===")
+            logger.warning(f"  - {isin}")
+    logger.info("=== Pipeline terminé ===")
 
 
 if __name__ == "__main__":
