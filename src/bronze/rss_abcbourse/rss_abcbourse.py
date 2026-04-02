@@ -1,4 +1,5 @@
 import os
+import sys
 from pathlib import Path
 import json
 import csv
@@ -7,27 +8,20 @@ from datetime import datetime
 from time import mktime
 from loguru import logger
 import feedparser
-from rapidfuzz import fuzz, process
+import re
 import pandas as pd
 from google.cloud import storage
 from google.cloud import bigquery
 from google.cloud.exceptions import NotFound
+from src.bronze.fuzzy_match import match_companies
+from dotenv import load_dotenv
 
 # --- CONFIGURATION ---
 JSON_DB_PATH_SOURCE = 'abcbourse_data.json'
 JSON_DB_PATH_SOURCE_RAW = 'abcbourse_data_raw.json'
-CSV_COMPANY_LIST_PATH = 'companies_draft.csv'
-GCP_PROJECT_ID = 'bootcamp-project-pea-pme'
-GCP_DATASET_ID = 'abcbourse'
-GCP_BUCKET_NAME = 'project-pea-pme'
-GCP_SOURCE_REFERENTIEL_BLOB = 'boursorama_peapme_final.csv'
+GCP_PREFIX_TABLE_ID = 'abcbourse'
+
 GCP_JSON_ACCESS_CREDENTIALS = "bootcamp-project-pea-pme.json"
-
-# Constants for fuzzy matching (adjust as needed)
-MATCH_THRESHOLD = 80
-SHORT_NAME_MAX_LEN = 6
-
-logger.info("Pipeline 'ingestion-abcbourse-peapme' started.")
 
 # Mapping of RSS sources
 rss_sources = [
@@ -36,6 +30,51 @@ rss_sources = [
     {"url": "http://www.abcbourse.com/rss/chroniquesrss", "key": "chroniques_rss"} 
 ]
 
+def load_and_log_environment():
+    """
+    Loads environment variables, logs their status, and returns them as a dictionary.
+
+    Input:
+        - None (Reads directly from the OS Environment Variables).
+
+    Output:
+        - config (dict): A dictionary mapping environment variable names to their values.
+    """
+
+    # Get current file's parent directory (3 levels up) to ensure we are in the project root
+    base_dir = Path(__file__).resolve().parents[3] 
+    
+    gcp_credential_json_file = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+    if not gcp_credential_json_file:
+        logger.critical("GOOGLE_APPLICATION_CREDENTIALS not defined")
+        sys.exit(1)
+
+    # Initialize the configuration dictionary by fetching values from the OS
+    config = {
+        "BASE_DIR": base_dir,
+        "GOOGLE_APPLICATION_CREDENTIALS": os.getenv("GOOGLE_APPLICATION_CREDENTIALS"),
+        "GCP_PROJECT_ID": os.getenv("GCP_PROJECT_ID"),
+        "GCS_BUCKET_NAME": os.getenv("GCS_BUCKET_NAME"),
+        "BQ_DATASET_BRONZE": os.getenv("BQ_DATASET_BRONZE"),
+        "GCS_SOURCE_REFERENTIEL": os.getenv("GCS_SOURCE_REFERENTIEL")
+    }   
+    
+    logger.info("--- Environment Configuration Check ---")   
+    
+    # Iterate through the dictionary to validate and log each setting
+    for var, value in config.items():
+        if value:
+            # Log the successfully loaded variable with alignment
+            logger.success(f"{var: <30} : {value}")
+        else:
+            # Critical warning if a variable is missing (value is None)
+            logger.warning(f"{var: <30} : NOT DEFINED")          
+
+    logger.info("---------------------------------------") 
+    
+    # Return the dictionary to the caller for further use in the pipeline
+    return config
+    
 def reset_local_db():
     """
     Completely resets the local JSON database by overwriting it 
@@ -49,8 +88,7 @@ def reset_local_db():
     script_dir = os.path.dirname(os.path.abspath(__file__))
     config_path = os.path.join(script_dir, JSON_DB_PATH_SOURCE)
     
-    # Define an empty structure for your new JSON
-    # This prevents 'FileNotFoundError' in subsequent steps
+    # Define an empty structure for your new JSON: to prevents 'FileNotFoundError' in subsequent steps
     empty_structure = {
         "sources": [],
         "last_updated": datetime.now().isoformat(),
@@ -88,8 +126,15 @@ def import_rss(json_data):
     Parses RSS feeds and appends new, unique entries to the provided data dictionary.
     
     Args:
-        json_data (dict): The in-memory database to be populated with news entries.
+        json_data (dict): The in-memory database (dictionary) to be populated. 
+                          Expected format: { "source_key": [ {entry_1}, {entry_2} ] }
+    
+    Returns:
+        None: Updates the json_data object in-place.
     """
+    # Global regex pattern for ISIN (2 letters + 10 alphanumeric characters)
+    ISIN_RE = re.compile(r'\b([A-Z]{2}[A-Z0-9]{10})\b')
+
     for source in rss_sources:
         key = source['key']
         url = source['url']
@@ -97,211 +142,134 @@ def import_rss(json_data):
         logger.info(f"--- Processing source: {key} ({url}) ---")
         feed = feedparser.parse(url)
         
-        # Safety check for feed parsing errors
         if feed.bozo:
             logger.warning(f"Feed at {url} might be malformed, attempting to parse anyway.")
 
-        # Extract existing GUIDs for this specific category to prevent duplicates
-        # Using a set provides O(1) lookup time, making it very efficient
+        # Extract existing GUIDs for deduplication
         existing_guids = {item['guid'] for item in json_data.get(key, [])}
         new_entries_count = 0
         
         for entry in feed.entries:
-            # Use the 'id' (GUID) or fallback to the 'link' for deduplication purposes
+            # Use 'id' (GUID) or fallback to 'link'
             guid = entry.get('id', entry.link)
             
             if guid not in existing_guids:
-                # Convert time to ISO format string
+                # 1. Handle Publication Date
                 if 'published_parsed' in entry:
                     pub_date = datetime.fromtimestamp(mktime(entry.published_parsed)).isoformat()
                 else:
                     pub_date = datetime.now().isoformat()
                 
-                # Dictionary representing the items we want to store in our JSON database
+                # Extract ISIN. Try to get it directly from common RSS tags (if provided by the source)
+                isin_value = entry.get('isin') or entry.get('finance_isin') or entry.get('asset_isin')
+                
+                # If no tag is found, search within Title and Summary using Regex
+                if not isin_value:
+                    title = entry.get('title', '')
+                    summary = entry.get('summary', '')
+                    search_text = f"{title} {summary}"
+                    
+                    match = ISIN_RE.search(search_text)
+                    isin_value = match.group(1) if match else None
+
+                # Build the new entry object
                 new_item = {
                     "guid": guid,
-                    "title": entry.title,
+                    "isin": isin_value,
+                    "title": entry.get('title', 'No Title'),
                     "link": entry.link,
                     "description": entry.get('summary', ''),
                     "published": pub_date,
                     "ingested_at": datetime.now().isoformat()
                 }
                 
-                # Ensure the category list exists and append the item
+                # Append to the database
                 if key not in json_data:
                     json_data[key] = []
                 
                 json_data[key].append(new_item)
                 new_entries_count += 1               
+
         logger.success(f"Finished {key}: Added {new_entries_count} new entries.")
 
-def load_company_list_gcs(bucket_name, blob_name):
+def load_company_list(base_path, file_rel_path):
     """
-    Reads the company CSV from a GCS bucket and returns a list of names in lowercase.
+    Reads a CSV file from the local filesystem and returns it as a Pandas DataFrame.
+
     Args:
-        bucket_name (str): The name of the GCS bucket
-        blob_name (str): The path to the CSV file within the bucket
+        base_path (str): The root directory (e.g., HOME path).
+        file_rel_path (str): The relative path to the CSV file from the base_path.
+
     Returns:
-        list: A list of company names in lowercase. Returns an empty list if an error occurs.
+        pd.DataFrame: A DataFrame containing the company list. 
+                      Returns an empty DataFrame if an error occurs.
     """
-    logger.info(f"Attempting to load company list from GCS: gs://{bucket_name}/{blob_name}")
-    company_names = []
+    # Construct the absolute path
+    full_path = os.path.join(base_path, file_rel_path)
+    
+    logger.info(f"Attempting to load company list from local path: {full_path}")
+    
     try:
-        # Initialize the GCS client
-        client = storage.Client()
-        bucket = client.bucket(bucket_name)
-        blob = bucket.blob(blob_name)
+        # Check if file exists before trying to read it
+        if not os.path.exists(full_path):
+            logger.error(f"File not found at: {full_path}")
+            return pd.DataFrame()
 
-        # Download the content as a string
-        content = blob.download_as_text(encoding='utf-8')
+        # Load directly from the local path
+        df = pd.read_csv(full_path)
         
-        # Use io.StringIO to let DictReader read the string as if it were a file
-        f = io.StringIO(content)
-        reader = csv.DictReader(f, delimiter=',')
-
-        for row in reader:
-            if 'name' in row and row['name']:
-                company_names.append(row['name'].strip().lower())      
-        logger.info(f"Successfully loaded from GCS. Found {len(company_names)} companies.")
+        # Column cleaning: force lowercase and remove leading/trailing whitespaces
+        df.columns = [c.strip().lower() for c in df.columns]
+        
+        logger.info(f"Successfully loaded from local storage. Found {len(df)} companies.")
+        return df
 
     except Exception as e:
-        # Ensure 'logger' is configured in your script
-        logger.error(f"Error reading CSV from GCS ({bucket_name}/{blob_name}): {e}")
-        
-    return company_names
+        # Log the error and return an empty DataFrame to avoid pipeline crashes
+        logger.error(f"Error reading local CSV: {e}")
+        return pd.DataFrame()
 
-def filter_rss_entries(db_data, company_list):
+def filter_rss_entries_fuzzy(db_data: dict, referentiel: pd.DataFrame) -> dict:
     """
-    Filters a dictionary of news items (db_data) keeping only those 
-    mentioning companies found in the company_list.
-    
-    Args:
-        db_data (dict[str, list]): local database loaded from JSON.
-        company_list (list): List of company names (strings).
-        
-    Returns:
-        dict[str, list]: A new dictionary containing only the matches found.
-    """   
+    Orchestrates fuzzy matching across multiple RSS categories using a reference DataFrame.
+
+    Input:
+        - db_data (dict): Dictionary where keys are categories (e.g., 'news_rss') 
+                          and values are lists of RSS entry dictionaries.
+        - referentiel (pd.DataFrame): Reference table containing official company names 
+                                      and identifiers (ISIN, Ticker).
+
+    Output:
+        - filtered_db (dict): Dictionary containing only the entries that successfully 
+                              matched a company, converted back to a list of records.
+    """
+    if referentiel.empty:
+        logger.warning("Referentiel is empty, skipping fuzzy matching.")
+        return {}
+
+    # Standardize column names: force lowercase and remove leading/trailing spaces
+    # This ensures consistency if the CSV uses 'Name' instead of 'name'
+    referentiel.columns = [c.lower().strip() for c in referentiel.columns]
+
     filtered_db = {}
-    
-    # Pre-process targets to lowercase for case-insensitive matching (strip whitespace as well)
-    targets = [c.lower().strip() for c in company_list]
-    
+
+    # Iterate through each RSS category and its corresponding entries
     for category, entries in db_data.items():
-        # Temporary list to store matches for the current category
-        category_matches = []
-        
-        for entry in entries:
-            # Extract text fields from the JSON entry and convert to lowercase for case-insensitive matching
-            title = entry.get('title', '').lower()
-            description = entry.get('description', '').lower()
-            content = f"{title} {description}"
-
-            # Check if any company name from our list exists as a substring
-            if any(company in content for company in targets):
-                category_matches.append(entry)
-        
-        # Only add the category to the new dict if it contains at least one match
-        if category_matches:
-            filtered_db[category] = category_matches
-    return filtered_db
-
-def filter_rss_entries_fuzzy(db_data: dict, referentiel) -> dict:
-    """
-    Filters RSS entries by matching content against a company reference list using fuzzy logic.
-    
-    Args:
-        db_data (dict): A dictionary where keys are categories and values are lists of 
-                        RSS entry dictionaries (e.g., {'tech': [{'title': '...', ...}]}).
-        referentiel (pd.DataFrame or list): A list of company names or a pandas DataFrame 
-                                            containing at least a 'name' column. If a DataFrame 
-                                            is provided, ISIN and Ticker are enriched.                                      
-    Returns:
-        dict: A filtered dictionary containing only entries that matched a company, 
-              enriched with match metadata (score, name, isin, ticker).
-    """
-    # Handle referentiel input type (DataFrame vs List)
-    is_df = isinstance(referentiel, pd.DataFrame)
-    
-    if is_df:
-        company_names = referentiel["name"].tolist()
-    else:
-        # If it's a list, we use it directly as the source of names
-        company_names = referentiel
-        
-    filtered_db = {}
-    
-  
-
-    def _scorer_for(name: str):
-        """Internal helper: Use strict ratio for short names, partial for long ones."""
-        return fuzz.token_set_ratio if len(name) <= SHORT_NAME_MAX_LEN else fuzz.partial_ratio
-
-    logger.info(f"Starting fuzzy filtering with {len(company_names)} reference names.")
-
-    for category, entries in db_data.items():
-        category_matches = []
-        
-        # Skip if entries is not a list (defensive check)
-        if not isinstance(entries, list):
+        if not entries:
             continue
             
-        for entry in entries:
-            # Prepare content for matching: combine Title and Description
-            title = entry.get('title', '')
-            description = entry.get('description', '')
-            content = f"{title} {description}"
-            
-            best_match = None
-            
-            # Find the best matching company name for this specific entry
-            for name in company_names:
-                scorer = _scorer_for(name)
-                
-                # result = (matched_string, score, index)
-                result = process.extractOne(
-                    content,
-                    [name],
-                    scorer=scorer,
-                    score_cutoff=MATCH_THRESHOLD,
-                    processor=str.casefold,
-                )
-                
-                if result and (best_match is None or result[1] > best_match[1]):
-                    best_match = result
-            
-            # Match is found: enrich the entry
-            if best_match:
-                matched_name, score, _ = best_match
-                enriched_entry = entry.copy()
-                
-                # Basic match info
-                enriched_entry.update({
-                    "matched_name": matched_name,
-                    "match_score": score,
-                })
-
-                # This prevents the "list indices must be integers" TypeError
-                if is_df:
-                    mask = referentiel["name"] == matched_name
-                    if not referentiel[mask].empty:
-                        ref_row = referentiel[mask].iloc[0]
-                        enriched_entry.update({
-                            "isin": ref_row.get("isin"),
-                            "ticker_bourso": ref_row.get("ticker_bourso"),
-                        })
-                else:
-                    # Default values if no DataFrame context is available
-                    enriched_entry.update({
-                        "isin": None,
-                        "ticker_bourso": None,
-                    })
-                
-                category_matches.append(enriched_entry)
+        # Call the core matching function (External dependency - UNTOUCHED)
+        matched_df = match_companies(entries, referentiel)
         
-        # Only add categories that have at least one match
-        if category_matches:
-            filtered_db[category] = category_matches
+        # Filter only valid matches based on the existence of 'matched_name'
+        if "matched_name" in matched_df.columns:
+            # Create a mask to identify rows where a match was actually found (not NaN)
+            mask = matched_df["matched_name"].notna()
+            final_matches_df = matched_df[mask]
+            
+            # If valid matches exist, store them in the final dictionary as list of dicts
+            if not final_matches_df.empty:
+                filtered_db[category] = final_matches_df.to_dict(orient="records")
             
     return filtered_db
 
@@ -374,19 +342,23 @@ def upload_full_json_to_bigquery(full_data_dict, project_id, dataset_id):
         if not rows:
             continue
 
-        table_ref = dataset_ref.table(table_name)
+        full_table_name = f"{GCP_PREFIX_TABLE_ID}_{table_name}"
+        table_ref = dataset_ref.table(full_table_name)
         
         try:
-            logger.info(f"Uploading to {table_name}...")
+            logger.info(f"Uploading to {full_table_name}...")
             load_job = client.load_table_from_json(rows, table_ref, job_config=job_config)
             load_job.result()  
-            logger.info(f"Success: Table '{table_name}' updated.")
+            logger.info(f"Success: Table '{full_table_name}' updated.")
         except Exception as e:
-            logger.error(f"Error uploading to table '{table_name}': {e}")
-
+            logger.error(f"Error uploading to table '{full_table_name}': {e}")
 
 if __name__ == "__main__":
     try:
+        logger.info("Pipeline 'ingestion-abcbourse-peapme' started.")
+        env = load_and_log_environment()
+        print(f"DEBUG: Credenziali attive -> {os.getenv('GOOGLE_APPLICATION_CREDENTIALS')}")
+   
         # Clear existing data to prevent duplicates
         db_items = reset_local_db()
     
@@ -398,7 +370,7 @@ if __name__ == "__main__":
         save_local_db(db_items, JSON_DB_PATH_SOURCE_RAW)
         
         # Get current list of companies from CSV in GCS
-        companies_list = load_company_list_gcs(GCP_BUCKET_NAME, GCP_SOURCE_REFERENTIEL_BLOB)
+        companies_list = load_company_list(env["BASE_DIR"], env["GCS_SOURCE_REFERENTIEL"])
             
         db_filtered_items = filter_rss_entries_fuzzy(db_items, companies_list)
         logger.info(f"Filtered RSS entries: {len(db_filtered_items)} matched company targets.")
@@ -407,14 +379,9 @@ if __name__ == "__main__":
         save_local_db(db_filtered_items)
         
         # Upload to GCP bucket
-        upload_to_bucket(JSON_DB_PATH_SOURCE_RAW, GCP_BUCKET_NAME, JSON_DB_PATH_SOURCE_RAW)
+        upload_to_bucket(JSON_DB_PATH_SOURCE_RAW, env["GCS_BUCKET_NAME"], JSON_DB_PATH_SOURCE_RAW)
         
-        # Upload to GCP BigQuery
-        current_path = Path(__file__).resolve()
-        project_root = current_path.parents[3]
-        credentials_path = os.path.join(project_root, GCP_JSON_ACCESS_CREDENTIALS)
-        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = credentials_path
-        upload_full_json_to_bigquery(db_items, GCP_PROJECT_ID, GCP_DATASET_ID)
+        upload_full_json_to_bigquery(db_filtered_items, env["GCP_PROJECT_ID"], env["BQ_DATASET_BRONZE"] )
 
     except Exception as e:
         logger.critical(f"Critical failure in ingestion pipeline: {e}")
