@@ -47,3 +47,18 @@ deployments:
       job_variables:
         env:
           GOOGLE_APPLICATION_CREDENTIALS_JSON: "{{ prefect.blocks.secret.gcp-sa-key }}"
+
+  - name: bronze-boursorama-peapme
+    version: "0.1.0"
+    tags: ["bronze", "boursorama", "peapme"]
+    description: "Bronze ingestion every 4h — Boursorama PEA-PME"
+    entrypoint: src/flows/boursorama_prefect_flow.py:boursorama_peapme_flow
+    schedule:
+      cron: "0 */4 * * *"
+      timezone: "Europe/Paris"
+    work_pool:
+      name: bronze-pool
+      work_queue_name: default
+      job_variables:
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: "{{ prefect.blocks.secret.gcp-sa-key }}"
