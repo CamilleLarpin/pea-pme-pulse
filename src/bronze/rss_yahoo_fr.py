@@ -1,7 +1,7 @@
 """Bronze ingestion — Yahoo Finance FR RSS."""
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import feedparser
 import pandas as pd
@@ -24,7 +24,7 @@ GCS_PREFIX = "rss_yahoo"
 def fetch_feed(url: str = FEED_URL) -> list[dict]:
     """Fetch Yahoo Finance FR RSS and return raw entries."""
     feed = feedparser.parse(url)
-    fetched_at = datetime.now(timezone.utc).isoformat()
+    fetched_at = datetime.now(UTC).isoformat()
     return [
         {
             "title": entry.get("title", ""),
@@ -43,7 +43,7 @@ def dump_to_gcs(entries: list[dict]) -> None:
     RSS feeds have no history — raw dump preserves original data before any filtering.
     """
     client = storage.Client(project=BQ_PROJECT)
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     blob_path = f"{GCS_PREFIX}/{timestamp}.json"
     bucket = client.bucket(GCS_BUCKET)
     bucket.blob(blob_path).upload_from_string(

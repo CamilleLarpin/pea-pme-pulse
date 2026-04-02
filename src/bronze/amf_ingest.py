@@ -4,6 +4,7 @@ import csv
 import json
 import os
 import re
+import shutil
 import tempfile
 from collections.abc import Iterator
 from dataclasses import dataclass
@@ -56,6 +57,28 @@ class Config:
         return f"{self.project_id}.{self.dataset_id}.{self.staging_table_id}"
 
 
+@dataclass(frozen=True)
+class RunContext:
+    run_id: str
+    tmp_dir: str
+    raw_output_path: str
+    clean_output_path: str
+
+
+@dataclass(frozen=True)
+class ExtractionArtifacts:
+    run_context: RunContext
+    raw_count: int
+    clean_count: int
+
+
+@dataclass(frozen=True)
+class GcsArtifacts:
+    extraction: ExtractionArtifacts
+    raw_uri: str
+    clean_uri: str
+
+
 def load_config() -> Config:
     return Config(
         project_id=os.environ["GCP_PROJECT_ID"],
@@ -85,7 +108,6 @@ BQ_SCHEMA: list[bigquery.SchemaField] = [
     bigquery.SchemaField("run_id", "STRING"),
     bigquery.SchemaField("ingestion_ts", "TIMESTAMP"),
 ]
-
 
 # ============================================================================
 # Utilities
@@ -135,17 +157,13 @@ def parse_api_datetime(value: object) -> str | None:
     if not raw:
         return None
 
-    # Normalizing well known format to ISO 8601 UTC-friendly.
-    # If value is correct, leave it as it is.
     try:
-        # formats like "2025-01-31T10:15:00+00:00", "2025-01-31T10:15:00Z", etc.
         normalized = raw.replace("Z", "+00:00")
         dt = datetime.fromisoformat(normalized)
         return isoformat_utc(dt)
     except ValueError:
         pass
 
-    # Simple format "YYYY-MM-DD"
     try:
         dt = datetime.strptime(raw, "%Y-%m-%d").replace(tzinfo=UTC)
         return isoformat_utc(dt)
@@ -156,6 +174,18 @@ def parse_api_datetime(value: object) -> str | None:
 
 def validate_isin(value: str) -> bool:
     return bool(ISIN_REGEX.fullmatch(value.strip().upper()))
+
+
+def prepare_run_context(prefix: str = f"{DATA_SOURCE}_ingest_") -> RunContext:
+    run_id = utc_now().strftime("%Y-%m-%dT%H-%M-%SZ")
+    tmp_dir = Path(tempfile.mkdtemp(prefix=prefix))
+
+    return RunContext(
+        run_id=run_id,
+        tmp_dir=str(tmp_dir),
+        raw_output_path=str(tmp_dir / f"{DATA_SOURCE}_raw.jsonl"),
+        clean_output_path=str(tmp_dir / f"{DATA_SOURCE}_clean.jsonl"),
+    )
 
 
 # ============================================================================
@@ -281,10 +311,8 @@ def build_clean_record(
 def extract_data(
     *,
     config: Config,
-    run_id: str,
-    raw_output_path: Path,
-    clean_output_path: Path,
-) -> tuple[int, int]:
+    run_context: RunContext,
+) -> ExtractionArtifacts:
     targets = load_targets(config.csv_path)
     isins = sorted(targets)
 
@@ -299,6 +327,9 @@ def extract_data(
     clean_count = 0
     invalid_json_count = 0
     duplicate_record_ids_seen: set[str] = set()
+
+    raw_output_path = Path(run_context.raw_output_path)
+    clean_output_path = Path(run_context.clean_output_path)
 
     with (
         open(raw_output_path, "w", encoding="utf-8") as raw_file,
@@ -319,41 +350,42 @@ def extract_data(
                 timeout=config.request_timeout,
             )
 
-            for raw_line in response.iter_lines(decode_unicode=True):
-                if not raw_line:
-                    continue
+            try:
+                for raw_line in response.iter_lines(decode_unicode=True):
+                    if not raw_line:
+                        continue
 
-                try:
-                    record = json.loads(raw_line)
-                except json.JSONDecodeError:
-                    invalid_json_count += 1
-                    logger.exception("Invalid JSON line skipped.")
-                    continue
+                    try:
+                        record = json.loads(raw_line)
+                    except json.JSONDecodeError:
+                        invalid_json_count += 1
+                        logger.exception("Invalid JSON line skipped.")
+                        continue
 
-                isin = str(record.get("identificationsociete_iso_cd_isi") or "").strip().upper()
-                if not isin or isin not in targets:
-                    continue
+                    isin = str(record.get("identificationsociete_iso_cd_isi") or "").strip().upper()
+                    if not isin or isin not in targets:
+                        continue
 
-                record_id = str(record.get("recordid") or "").strip()
-                if record_id and record_id in duplicate_record_ids_seen:
-                    logger.debug("Duplicate record_id skipped in raw stream: {}", record_id)
-                    continue
+                    record_id = str(record.get("recordid") or "").strip()
+                    if record_id and record_id in duplicate_record_ids_seen:
+                        logger.debug("Duplicate record_id skipped in raw stream: {}", record_id)
+                        continue
 
-                if record_id:
-                    duplicate_record_ids_seen.add(record_id)
+                    if record_id:
+                        duplicate_record_ids_seen.add(record_id)
 
-                raw_file.write(json.dumps(record, ensure_ascii=False) + "\n")
-                raw_count += 1
+                    raw_file.write(json.dumps(record, ensure_ascii=False) + "\n")
+                    raw_count += 1
 
-                clean_record = build_clean_record(
-                    record,
-                    run_id=run_id,
-                    ingestion_ts=ingestion_ts,
-                )
-                clean_file.write(json.dumps(clean_record, ensure_ascii=False) + "\n")
-                clean_count += 1
-
-            response.close()
+                    clean_record = build_clean_record(
+                        record,
+                        run_id=run_context.run_id,
+                        ingestion_ts=ingestion_ts,
+                    )
+                    clean_file.write(json.dumps(clean_record, ensure_ascii=False) + "\n")
+                    clean_count += 1
+            finally:
+                response.close()
 
     if invalid_json_count:
         logger.warning("{} invalid JSON line(s) skipped", invalid_json_count)
@@ -362,7 +394,11 @@ def extract_data(
     logger.info("- Raw records written   : {}", raw_count)
     logger.info("- Clean records written : {}", clean_count)
 
-    return raw_count, clean_count
+    return ExtractionArtifacts(
+        run_context=run_context,
+        raw_count=raw_count,
+        clean_count=clean_count,
+    )
 
 
 # ============================================================================
@@ -400,11 +436,14 @@ def upload_to_gcs(
 def dump_gcs(
     *,
     config: Config,
-    run_id: str,
-    raw_output_path: Path,
-    clean_output_path: Path,
-) -> tuple[str, str]:
+    extraction: ExtractionArtifacts,
+) -> GcsArtifacts:
     storage_client = storage.Client(project=config.project_id)
+
+    run_context = extraction.run_context
+    run_id = run_context.run_id
+    raw_output_path = Path(run_context.raw_output_path)
+    clean_output_path = Path(run_context.clean_output_path)
 
     raw_blob = f"{config.gcs_prefix}/raw/run_id={run_id}/{config.gcs_prefix}_raw.jsonl"
     clean_blob = f"{config.gcs_prefix}/clean/run_id={run_id}/{config.gcs_prefix}_clean.jsonl"
@@ -432,7 +471,44 @@ def dump_gcs(
     )
     logger.info("Upload OK: {}", clean_uri)
 
-    return raw_uri, clean_uri
+    return GcsArtifacts(
+        extraction=extraction,
+        raw_uri=raw_uri,
+        clean_uri=clean_uri,
+    )
+
+
+def extract_and_dump_gcs(*, config: Config) -> GcsArtifacts:
+    run_context = prepare_run_context()
+
+    logger.info(
+        "Starting extract+dump for source={} run_id={}",
+        DATA_SOURCE,
+        run_context.run_id,
+    )
+
+    try:
+        extraction = extract_data(
+            config=config,
+            run_context=run_context,
+        )
+
+        gcs_artifacts = dump_gcs(
+            config=config,
+            extraction=extraction,
+        )
+
+        logger.info(
+            "Extract+dump completed for run_id={} | raw_count={} | clean_count={} | clean_uri={}",
+            run_context.run_id,
+            extraction.raw_count,
+            extraction.clean_count,
+            gcs_artifacts.clean_uri,
+        )
+
+        return gcs_artifacts
+    finally:
+        cleanup_run_context(run_context)
 
 
 # ============================================================================
@@ -441,7 +517,10 @@ def dump_gcs(
 
 
 def ensure_dataset_exists(
-    client: bigquery.Client, project_id: str, dataset_id: str, location: str
+    client: bigquery.Client,
+    project_id: str,
+    dataset_id: str,
+    location: str,
 ) -> None:
     dataset_ref = bigquery.Dataset(f"{project_id}.{dataset_id}")
     dataset_ref.location = location
@@ -467,13 +546,6 @@ def ensure_table_exists(client: bigquery.Client, full_table_id: str) -> None:
         table.clustering_fields = ["isin", "record_id"]
         client.create_table(table)
         logger.info("Table created: {}", full_table_id)
-
-
-def truncate_staging_table(client: bigquery.Client, full_staging_table_id: str) -> None:
-    query = f"TRUNCATE TABLE `{full_staging_table_id}`"
-    job = client.query(query)
-    job.result()
-    logger.info("Staging table truncated: {}", full_staging_table_id)
 
 
 def gcs_to_bq(
@@ -543,16 +615,25 @@ def merge_staging_into_target(
     logger.info("MERGE completed from {} into {}", staging_table_id, target_table_id)
 
 
-def inject_bq(config: Config, clean_uri: str) -> None:
+def inject_bq(
+    *,
+    config: Config,
+    gcs_artifacts: GcsArtifacts,
+) -> None:
     bq_client = bigquery.Client(project=config.project_id)
 
-    ensure_dataset_exists(bq_client, config.project_id, config.dataset_id, config.location)
+    ensure_dataset_exists(
+        client=bq_client,
+        project_id=config.project_id,
+        dataset_id=config.dataset_id,
+        location=config.location,
+    )
     ensure_table_exists(bq_client, config.full_table_id)
     ensure_table_exists(bq_client, config.full_staging_table_id)
 
     gcs_to_bq(
         client=bq_client,
-        gcs_uri=clean_uri,
+        gcs_uri=gcs_artifacts.clean_uri,
         full_table_id=config.full_staging_table_id,
         write_disposition=config.write_disposition_staging,
         schema=BQ_SCHEMA,
@@ -566,7 +647,7 @@ def inject_bq(config: Config, clean_uri: str) -> None:
 
 
 # ============================================================================
-# Main
+# Cleanup
 # ============================================================================
 
 
@@ -580,33 +661,42 @@ def cleanup_local_files(*paths: Path) -> None:
             logger.exception("Failed to remove local file: {}", path)
 
 
+def cleanup_run_context(run_context: RunContext) -> None:
+    raw_output_path = Path(run_context.raw_output_path)
+    clean_output_path = Path(run_context.clean_output_path)
+    tmp_dir = Path(run_context.tmp_dir)
+
+    cleanup_local_files(raw_output_path, clean_output_path)
+
+    try:
+        if tmp_dir.exists():
+            shutil.rmtree(tmp_dir)
+            logger.info("Temporary directory removed: {}", tmp_dir)
+    except OSError:
+        logger.exception("Failed to remove temporary directory: {}", tmp_dir)
+
+
+# ============================================================================
+# Main
+# ============================================================================
+
+
 def run_pipeline() -> None:
     config = load_config()
-    run_id = utc_now().strftime("%Y-%m-%dT%H-%M-%SZ")
+    gcs_artifacts = extract_and_dump_gcs(config=config)
 
-    logger.info("Starting ingestion for source={} run_id={}", DATA_SOURCE, run_id)
+    inject_bq(
+        config=config,
+        gcs_artifacts=gcs_artifacts,
+    )
 
-    with tempfile.TemporaryDirectory(prefix="amf_ingest_") as tmp_dir:
-        tmp_path = Path(tmp_dir)
-        raw_output_path = tmp_path / "amf_raw.jsonl"
-        clean_output_path = tmp_path / "amf_clean.jsonl"
+    logger.info(
+        "Ingestion finished successfully for run_id={} | raw_uri={} | clean_uri={}",
+        gcs_artifacts.extraction.run_context.run_id,
+        gcs_artifacts.raw_uri,
+        gcs_artifacts.clean_uri,
+    )
 
-        extract_data(
-            config=config,
-            run_id=run_id,
-            raw_output_path=raw_output_path,
-            clean_output_path=clean_output_path,
-        )
 
-        _, clean_uri = dump_gcs(
-            config=config,
-            run_id=run_id,
-            raw_output_path=raw_output_path,
-            clean_output_path=clean_output_path,
-        )
-
-        inject_bq(config, clean_uri)
-
-        cleanup_local_files(raw_output_path, clean_output_path)
-
-    logger.info("Ingestion finished successfully for run_id={}", run_id)
+if __name__ == "__main__":
+    run_pipeline()

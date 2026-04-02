@@ -1,7 +1,6 @@
 """Tests — Bronze · Google News RSS ingestion."""
 
 import pandas as pd
-import pytest
 
 from bronze.fuzzy_match import clean_title, match_companies
 from bronze.rss_google_news import fetch_all_feeds

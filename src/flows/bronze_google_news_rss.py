@@ -3,7 +3,7 @@
 from pathlib import Path
 
 import pandas as pd
-from prefect import flow, task, get_run_logger
+from prefect import flow, get_run_logger, task
 
 REFERENTIEL_PATH = Path(__file__).parent.parent.parent / "referentiel" / "boursorama_peapme_final.csv"
 
