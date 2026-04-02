@@ -1,0 +1,16 @@
+Metadata-Version: 2.4
+Name: pea-pme-pulse
+Version: 0.1.0
+Summary: Daily investment signal engine for PEA-PME holdings
+Requires-Python: >=3.11
+Requires-Dist: requests
+Requires-Dist: beautifulsoup4
+Requires-Dist: lxml
+Requires-Dist: yfinance
+Requires-Dist: ta
+Requires-Dist: feedparser
+Requires-Dist: pandas
+Requires-Dist: rapidfuzz
+Provides-Extra: dev
+Requires-Dist: ruff; extra == "dev"
+Requires-Dist: pytest; extra == "dev"

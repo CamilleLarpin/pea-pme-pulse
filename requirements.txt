@@ -1,0 +1,4 @@
+prefect[docker]
+requests
+beautifulsoup4
+urllib3

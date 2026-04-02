@@ -1,0 +1,29 @@
+prefect-version: null
+name: boursorama-peapme
+
+build:
+  - prefect_docker.deployments.steps.build_docker_image:
+      id: build-image
+      requires: prefect-docker>=0.6.0
+      image_name: boursorama-peapme
+      tag: latest
+      dockerfile: Dockerfile
+
+push: null
+
+pull:
+  - prefect.deployments.steps.set_working_directory:
+      directory: /app
+
+deployments:
+  - name: boursorama-peapme-ingestion
+    description: "Ingestion Boursorama PEA-PME -> CSV"
+    version: "{{ build-image.tag }}"
+    entrypoint: app/boursorama_prefect_flow.py:run_pipeline
+    work_pool:
+      name: boursorama-pool
+      work_queue_name: default
+      job_variables:
+        image: "{{ build-image.image }}"
+    parameters:
+      output_csv: /app/data/boursorama_peapme_final.csv
