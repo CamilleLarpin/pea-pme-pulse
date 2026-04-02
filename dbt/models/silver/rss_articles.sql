@@ -1,10 +1,18 @@
 -- Silver: unified RSS articles from all sources
--- Cleans and deduplicates Bronze RSS tables into a single company-matched article feed.
+-- Incremental merge on row_id — only processes new Bronze rows each run.
+-- row_id: surrogate key on (lower(title), isin) — stable dedup key across sources
 -- published_at: parsed from RFC 2822 string (e.g. "Thu, 02 Apr 2026 15:30:00 GMT")
--- Dedup key: (lower(title), isin) — same article matched to same company across sources
+
+{{ config(
+    materialized='incremental',
+    unique_key='row_id',
+    incremental_strategy='merge',
+    on_schema_change='fail',
+) }}
 
 with yahoo as (
     select
+        to_hex(md5(concat(lower(title), '|', isin))) as row_id,
         title,
         link,
         summary,
@@ -17,10 +25,14 @@ with yahoo as (
         safe.parse_timestamp('%a, %d %b %Y %H:%M:%S %Z', published) as published_at
     from {{ source('bronze', 'yahoo_rss') }}
     where isin is not null
+    {% if is_incremental() %}
+    and fetched_at > (select max(fetched_at) from {{ this }})
+    {% endif %}
 ),
 
 google_news as (
     select
+        to_hex(md5(concat(lower(title), '|', isin))) as row_id,
         title,
         link,
         summary,
@@ -33,6 +45,9 @@ google_news as (
         safe.parse_timestamp('%a, %d %b %Y %H:%M:%S %Z', published) as published_at
     from {{ source('bronze', 'google_news_rss') }}
     where isin is not null
+    {% if is_incremental() %}
+    and fetched_at > (select max(fetched_at) from {{ this }})
+    {% endif %}
 ),
 
 unioned as (
@@ -45,7 +60,7 @@ deduped as (
     select *
     from unioned
     qualify row_number() over (
-        partition by lower(title), isin
+        partition by row_id
         order by fetched_at desc
     ) = 1
 )
