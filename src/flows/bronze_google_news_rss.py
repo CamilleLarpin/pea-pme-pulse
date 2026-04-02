@@ -1,9 +1,19 @@
 """Prefect flow — Bronze RSS ingestion (Google News)."""
 
+import os
 import sys
+import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
+
+# Prefect Managed runner passes GCP credentials as JSON env var — write to temp file
+_gcp_creds_json = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS_JSON")
+if _gcp_creds_json and not os.environ.get("GOOGLE_APPLICATION_CREDENTIALS"):
+    _tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False)
+    _tmp.write(_gcp_creds_json)
+    _tmp.close()
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = _tmp.name
 
 import pandas as pd
 from prefect import flow, task, get_run_logger

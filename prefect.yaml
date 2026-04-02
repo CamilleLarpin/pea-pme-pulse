@@ -14,12 +14,8 @@ pull:
       repository: https://github.com/CamilleLarpin/pea-pme-pulse.git
       branch: main
   - prefect.deployments.steps.run_shell_script:
-      script: |
-        pip install -e ".[dev]"
-        echo "$GCP_SA_KEY" > /tmp/gcp_creds.json
+      script: pip install -e ".[dev]"
       directory: "{{ git_clone.directory }}"
-      env:
-        GCP_SA_KEY: "{{ prefect.blocks.secret.gcp-sa-key }}"
 
 deployments:
   - name: bronze-yahoo-rss
@@ -35,7 +31,7 @@ deployments:
       work_queue_name: default
       job_variables:
         env:
-          GOOGLE_APPLICATION_CREDENTIALS: /tmp/gcp_creds.json
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: "{{ prefect.blocks.secret.gcp-sa-key }}"
 
   - name: bronze-google-news-rss
     version: "0.1.0"
@@ -50,4 +46,4 @@ deployments:
       work_queue_name: default
       job_variables:
         env:
-          GOOGLE_APPLICATION_CREDENTIALS: /tmp/gcp_creds.json
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: "{{ prefect.blocks.secret.gcp-sa-key }}"
