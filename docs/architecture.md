@@ -98,5 +98,5 @@ prefect worker start --pool bronze-rss-pool   # on GCP e2-small
 
 ## Referentiel
 
-Master referentiel: `referentiel/boursorama_peapme_final.csv` (569 companies)
-Key columns: `nom`, `ticker_bourso`, `isin`
+Master referentiel: `referentiel/boursorama_peapme_final.csv` (571 companies)
+Key columns: `name`, `ticker_bourso`, `isin`
