@@ -2,7 +2,7 @@
 name = "pea-pme-pulse"
 version = "0.1.0"
 description = "Daily investment signal engine for PEA-PME holdings"
-requires-python = ">=3.11"
+requires-python = "<4.0,>=3.10"
 dependencies = [
     "requests",
     "beautifulsoup4",
@@ -12,13 +12,64 @@ dependencies = [
     "feedparser",
     "pandas",
     "rapidfuzz",
+    "prefect>=3.0",
+    "prefect-gcp>=0.6",
+    "loguru",
+    "google-cloud-bigquery",
+    "google-cloud-storage",
+    "pandas-gbq",
+    "db-dtypes",
+    "google-api-core (>=2.30.1,<3.0.0)",
+    "google-cloud-core (>=2.5.1,<3.0.0)",
 ]
 
 [project.optional-dependencies]
 dev = [
     "ruff",
     "pytest",
+    "pytest-mock (>=3.15.1,<4.0.0)",
 ]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
 
 [tool.ruff]
 line-length = 100
+target-version = "py311"
+
+# Excluded folders
+exclude = [
+    ".git",
+    "__pycache__",
+    ".venv",
+    "build",
+    "dist",
+]
+
+# Activated rules
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle
+    "F",   # pyflakes (bugs)
+    "I",   # isort (imports)
+    "UP",  # python modernisation
+    "B",   # bugbear (good patterns)
+    "SIM", # simplifications
+]
+
+ignore = [
+    "E501",  # over-length line
+]
+
+# Import sorting
+[tool.ruff.lint.isort]
+known-first-party = ["src"]
+
+# Ruff formater
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"

@@ -1,19 +1,31 @@
 help:
 	@echo "Available targets:"
+	@echo "  make lint       -> check code quality"
+	@echo "  make format     -> format code"
 	@echo "  make gcp-auth   -> GCP login + ADC"
 	@echo "  make gcp-setup  -> login + ADC + projet"
 	@echo "  make gcp-check  -> check gcp configuration"
 	@echo "  make gcp-reset  -> reset ADC authentication and unset project"
 
+.PHONY: lint lint-fix format test quality gcp-setup gcp-auth gcp-check gcp-reset
+
 install:
 
 lint:
+	poetry run ruff check .
+
+lint-fix:
+	poetry run ruff check . --fix
 
 format:
+	poetry run ruff format .
+
+test:
+	poetry run pytest -q
+
+quality: lint-fix format test
 
 clean:
-
-.PHONY: gcp-setup gcp-auth gcp-check gcp-reset
 
 gcp-setup: gcp-auth
 	@echo "Project $(GCP_PROJECT_ID) configuration "
