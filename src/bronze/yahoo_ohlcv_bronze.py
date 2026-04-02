@@ -8,7 +8,7 @@
 # Architecture Bronze/Silver :
 #   Bronze (ce script) = données brutes OHLCV sans transformation
 #   Silver (étape suivante) = indicateurs techniques calculés via ta
-#     → RSI_14, MACD, MACD_signal, BB_upper/lower, EMA_20, EMA_50
+#     → RSI_14, MACD, MACD_signal, BB_upper/lower, EMA_20, SMA_50, SMA_200
 #
 # Flux :
 #   boursorama_peapme_final.csv
@@ -47,7 +47,7 @@ HISTORY_PERIOD = "max"
 
 # Pause entre chaque appel Yahoo pour éviter le rate-limiting
 # yfinance ne publie pas de limite officielle — 0.5s est un compromis
-# sûr pour 459 ISINs. Remonter à 1.0 si des erreurs 429 apparaissent.
+# sûr pour ~560 ISINs. Remonter à 1.0 si des erreurs 429 apparaissent.
 SLEEP_BETWEEN_CALLS = 0.5
 
 # Schéma BQ explicite — garantit DATE et TIMESTAMP corrects
@@ -256,7 +256,7 @@ def write_to_bigquery(client: bigquery.Client, df: pd.DataFrame) -> None:
 # Orchestration
 # ---------------------------------------------------------------------------
 
-def run() -> None:
+def run() -> dict:
     logger.info("=== Démarrage pipeline Bronze OHLCV ===")
     logger.info(f"Historique : {HISTORY_PERIOD} | Destination : {BQ_TABLE_REF}")
 
@@ -302,6 +302,16 @@ def run() -> None:
             time.sleep(SLEEP_BETWEEN_CALLS)
             continue
 
+        # Filtre défensif : exclut les dates déjà présentes en BQ
+        # Protège contre les doublons si get_last_dates() retourne une valeur périmée
+        if start_date is not None:
+            df_ohlcv = df_ohlcv[df_ohlcv["Date"] > start_date]
+            if df_ohlcv.empty:
+                logger.info("  → déjà à jour après filtrage, skip")
+                skipped.append(isin)
+                time.sleep(SLEEP_BETWEEN_CALLS)
+                continue
+
         # Écriture BQ
         try:
             write_to_bigquery(client, df_ohlcv)
@@ -323,6 +333,8 @@ def run() -> None:
         for isin in failed:
             logger.warning(f"  - {isin}")
     logger.info("=== Pipeline terminé ===")
+
+    return {"success": len(success), "skipped": len(skipped), "failed": len(failed), "total": total}
 
 
 if __name__ == "__main__":
