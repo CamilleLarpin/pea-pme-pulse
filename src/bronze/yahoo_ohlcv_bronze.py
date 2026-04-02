@@ -1,4 +1,4 @@
-# src/bronze/fetch_ohlcv.py
+# src/bronze/yahoo_ohlcv_bronze.py
 #
 # Pipeline Bronze — OHLCV PEA-PME
 # Source      : Yahoo Finance (via yfinance)
