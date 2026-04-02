@@ -21,7 +21,7 @@ JSON_DB_PATH_SOURCE = 'abcbourse_data.json'
 JSON_DB_PATH_SOURCE_RAW = 'abcbourse_data_raw.json'
 GCP_PREFIX_TABLE_ID = 'abcbourse'
 
-GCP_JSON_ACCESS_CREDENTIALS = "bootcamp-project-pea-pme.json"
+#GCP_JSON_ACCESS_CREDENTIALS = "bootcamp-project-pea-pme.json"
 
 # Mapping of RSS sources
 rss_sources = [
