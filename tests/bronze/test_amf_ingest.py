@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import json
 from pathlib import Path
 from unittest.mock import Mock
 
@@ -30,6 +31,36 @@ def sample_config() -> mod.Config:
     )
 
 
+@pytest.fixture
+def sample_run_context(tmp_path: Path) -> mod.RunContext:
+    return mod.RunContext(
+        run_id="2026-04-02T10-00-00Z",
+        tmp_dir=str(tmp_path),
+        raw_output_path=str(tmp_path / "amf_raw.jsonl"),
+        clean_output_path=str(tmp_path / "amf_clean.jsonl"),
+    )
+
+
+@pytest.fixture
+def sample_extraction_artifacts(sample_run_context: mod.RunContext) -> mod.ExtractionArtifacts:
+    return mod.ExtractionArtifacts(
+        run_context=sample_run_context,
+        raw_count=12,
+        clean_count=10,
+    )
+
+
+@pytest.fixture
+def sample_gcs_artifacts(
+    sample_extraction_artifacts: mod.ExtractionArtifacts,
+) -> mod.GcsArtifacts:
+    return mod.GcsArtifacts(
+        extraction=sample_extraction_artifacts,
+        raw_uri="gs://my-bucket/amf/raw/run_id=2026-04-02T10-00-00Z/amf_raw.jsonl",
+        clean_uri="gs://my-bucket/amf/clean/run_id=2026-04-02T10-00-00Z/amf_clean.jsonl",
+    )
+
+
 # ============================================================================
 # validate_isin
 # ============================================================================
@@ -41,11 +72,11 @@ def sample_config() -> mod.Config:
         ("FR0000120271", True),
         ("US0378331005", True),
         ("GB0002634946", True),
-        ("fr0000120271", True),  # load_targets upper() avant validation
+        ("fr0000120271", True),
         ("", False),
         ("123", False),
-        ("FR000012027", False),  # trop court
-        ("FR00001202711", False),  # trop long
+        ("FR000012027", False),
+        ("FR00001202711", False),
         ("FR00001202$1", False),
     ],
 )
@@ -95,6 +126,23 @@ def test_parse_api_datetime_invalid_returns_none() -> None:
 
 
 # ============================================================================
+# prepare_run_context
+# ============================================================================
+
+
+def test_prepare_run_context_creates_expected_paths() -> None:
+    result = mod.prepare_run_context()
+
+    assert isinstance(result, mod.RunContext)
+    assert result.run_id
+    assert Path(result.tmp_dir).exists()
+    assert result.raw_output_path.endswith("amf_raw.jsonl")
+    assert result.clean_output_path.endswith("amf_clean.jsonl")
+
+    mod.cleanup_run_context(result)
+
+
+# ============================================================================
 # build_where_clause
 # ============================================================================
 
@@ -104,7 +152,7 @@ def test_build_where_clause_ok() -> None:
 
     result = mod.build_where_clause(isins)
 
-    assert result == ("identificationsociete_iso_cd_isi IN ('FR0000120271','US0378331005')")
+    assert result == "identificationsociete_iso_cd_isi IN ('FR0000120271','US0378331005')"
 
 
 def test_build_where_clause_raises_on_invalid_isin() -> None:
@@ -185,6 +233,196 @@ def test_build_clean_record_maps_fields_correctly() -> None:
 
 
 # ============================================================================
+# extract_data
+# ============================================================================
+
+
+def test_extract_data_writes_raw_and_clean_files_and_counts(
+    mocker,
+    sample_config: mod.Config,
+    sample_run_context: mod.RunContext,
+) -> None:
+    mocker.patch.object(mod, "load_targets", return_value={"FR0000120271", "US0378331005"})
+    mocker.patch.object(mod, "build_requests_session", return_value=Mock())
+    mocker.patch.object(mod, "isoformat_utc", side_effect=lambda dt: "2026-04-02T10:00:00+00:00")
+
+    response = Mock()
+    response.iter_lines.return_value = [
+        json.dumps(
+            {
+                "recordid": "id-1",
+                "identificationsociete_iso_nom_soc": "ACME SA",
+                "identificationsociete_iso_cd_isi": "FR0000120271",
+                "uin_dat_amf": "2025-01-31",
+                "url_de_recuperation": "https://example.com/1.pdf",
+                "informationdeposee_inf_tit_inf": "Titre 1",
+                "sous_type_d_information": "Sous-type 1",
+                "type_d_information": "Type 1",
+            }
+        ),
+        json.dumps(
+            {
+                "recordid": "id-1",
+                "identificationsociete_iso_nom_soc": "ACME SA DUP",
+                "identificationsociete_iso_cd_isi": "FR0000120271",
+                "uin_dat_amf": "2025-01-31",
+                "url_de_recuperation": "https://example.com/1-dup.pdf",
+                "informationdeposee_inf_tit_inf": "Titre 1 DUP",
+                "sous_type_d_information": "Sous-type DUP",
+                "type_d_information": "Type DUP",
+            }
+        ),
+        json.dumps(
+            {
+                "recordid": "id-2",
+                "identificationsociete_iso_nom_soc": "APPLE INC",
+                "identificationsociete_iso_cd_isi": "US0378331005",
+                "uin_dat_amf": "2025-02-01",
+                "url_de_recuperation": "https://example.com/2.pdf",
+                "informationdeposee_inf_tit_inf": "Titre 2",
+                "sous_type_d_information": "Sous-type 2",
+                "type_d_information": "Type 2",
+            }
+        ),
+        json.dumps(
+            {
+                "recordid": "id-3",
+                "identificationsociete_iso_nom_soc": "OUT OF SCOPE",
+                "identificationsociete_iso_cd_isi": "BE0000000001",
+                "uin_dat_amf": "2025-02-01",
+                "url_de_recuperation": "https://example.com/3.pdf",
+                "informationdeposee_inf_tit_inf": "Titre 3",
+                "sous_type_d_information": "Sous-type 3",
+                "type_d_information": "Type 3",
+            }
+        ),
+    ]
+    mocker.patch.object(mod, "fetch_export_jsonl", return_value=response)
+
+    result = mod.extract_data(
+        config=sample_config,
+        run_context=sample_run_context,
+    )
+
+    assert result == mod.ExtractionArtifacts(
+        run_context=sample_run_context,
+        raw_count=2,
+        clean_count=2,
+    )
+
+    raw_path = Path(sample_run_context.raw_output_path)
+    clean_path = Path(sample_run_context.clean_output_path)
+
+    assert raw_path.exists()
+    assert clean_path.exists()
+
+    raw_lines = raw_path.read_text(encoding="utf-8").splitlines()
+    clean_lines = clean_path.read_text(encoding="utf-8").splitlines()
+
+    assert len(raw_lines) == 2
+    assert len(clean_lines) == 2
+
+    raw_records = [json.loads(line) for line in raw_lines]
+    clean_records = [json.loads(line) for line in clean_lines]
+
+    assert raw_records[0]["recordid"] == "id-1"
+    assert raw_records[1]["recordid"] == "id-2"
+
+    assert clean_records[0]["record_id"] == "id-1"
+    assert clean_records[1]["record_id"] == "id-2"
+    assert clean_records[0]["run_id"] == sample_run_context.run_id
+    assert clean_records[0]["source"] == mod.DATA_SOURCE
+
+    response.close.assert_called_once()
+
+
+# ============================================================================
+# dump_gcs
+# ============================================================================
+
+
+def test_dump_gcs_uploads_both_files_and_returns_gcs_artifacts(
+    mocker,
+    sample_config: mod.Config,
+    sample_extraction_artifacts: mod.ExtractionArtifacts,
+) -> None:
+    raw_path = Path(sample_extraction_artifacts.run_context.raw_output_path)
+    clean_path = Path(sample_extraction_artifacts.run_context.clean_output_path)
+
+    raw_path.write_text("raw-content\n", encoding="utf-8")
+    clean_path.write_text("clean-content\n", encoding="utf-8")
+
+    fake_storage_client = Mock()
+    mocker.patch.object(mod.storage, "Client", return_value=fake_storage_client)
+
+    upload_to_gcs = mocker.patch.object(
+        mod,
+        "upload_to_gcs",
+        side_effect=[
+            "gs://my-bucket/amf/raw/run_id=2026-04-02T10-00-00Z/amf_raw.jsonl",
+            "gs://my-bucket/amf/clean/run_id=2026-04-02T10-00-00Z/amf_clean.jsonl",
+        ],
+    )
+
+    result = mod.dump_gcs(
+        config=sample_config,
+        extraction=sample_extraction_artifacts,
+    )
+
+    mod.storage.Client.assert_called_once_with(project=sample_config.project_id)
+
+    assert upload_to_gcs.call_count == 2
+
+    upload_to_gcs.assert_any_call(
+        client=fake_storage_client,
+        bucket_name=sample_config.bucket_name,
+        local_file=raw_path,
+        destination_blob="amf/raw/run_id=2026-04-02T10-00-00Z/amf_raw.jsonl",
+        location=sample_config.location,
+    )
+
+    upload_to_gcs.assert_any_call(
+        client=fake_storage_client,
+        bucket_name=sample_config.bucket_name,
+        local_file=clean_path,
+        destination_blob="amf/clean/run_id=2026-04-02T10-00-00Z/amf_clean.jsonl",
+        location=sample_config.location,
+    )
+
+    assert result == mod.GcsArtifacts(
+        extraction=sample_extraction_artifacts,
+        raw_uri="gs://my-bucket/amf/raw/run_id=2026-04-02T10-00-00Z/amf_raw.jsonl",
+        clean_uri="gs://my-bucket/amf/clean/run_id=2026-04-02T10-00-00Z/amf_clean.jsonl",
+    )
+
+
+# ============================================================================
+# cleanup_run_context
+# ============================================================================
+
+
+def test_cleanup_run_context_removes_files_and_directory(tmp_path: Path) -> None:
+    raw_file = tmp_path / "amf_raw.jsonl"
+    clean_file = tmp_path / "amf_clean.jsonl"
+
+    raw_file.write_text("raw", encoding="utf-8")
+    clean_file.write_text("clean", encoding="utf-8")
+
+    run_context = mod.RunContext(
+        run_id="run-001",
+        tmp_dir=str(tmp_path),
+        raw_output_path=str(raw_file),
+        clean_output_path=str(clean_file),
+    )
+
+    mod.cleanup_run_context(run_context)
+
+    assert not raw_file.exists()
+    assert not clean_file.exists()
+    assert not tmp_path.exists()
+
+
+# ============================================================================
 # merge_staging_into_target
 # ============================================================================
 
@@ -215,7 +453,11 @@ def test_merge_staging_into_target_executes_query() -> None:
 # ============================================================================
 
 
-def test_inject_bq_calls_expected_steps(mocker, sample_config: mod.Config) -> None:
+def test_inject_bq_calls_expected_steps(
+    mocker,
+    sample_config: mod.Config,
+    sample_gcs_artifacts: mod.GcsArtifacts,
+) -> None:
     fake_client = Mock()
 
     mocker.patch.object(mod.bigquery, "Client", return_value=fake_client)
@@ -224,15 +466,18 @@ def test_inject_bq_calls_expected_steps(mocker, sample_config: mod.Config) -> No
     gcs_to_bq = mocker.patch.object(mod, "gcs_to_bq")
     merge = mocker.patch.object(mod, "merge_staging_into_target")
 
-    mod.inject_bq(sample_config, "gs://bucket/amf/clean/file.jsonl")
+    mod.inject_bq(
+        config=sample_config,
+        gcs_artifacts=sample_gcs_artifacts,
+    )
 
     mod.bigquery.Client.assert_called_once_with(project=sample_config.project_id)
 
     ensure_dataset.assert_called_once_with(
-        fake_client,
-        sample_config.project_id,
-        sample_config.dataset_id,
-        sample_config.location,
+        client=fake_client,
+        project_id=sample_config.project_id,
+        dataset_id=sample_config.dataset_id,
+        location=sample_config.location,
     )
 
     assert ensure_table.call_count == 2
@@ -241,7 +486,7 @@ def test_inject_bq_calls_expected_steps(mocker, sample_config: mod.Config) -> No
 
     gcs_to_bq.assert_called_once_with(
         client=fake_client,
-        gcs_uri="gs://bucket/amf/clean/file.jsonl",
+        gcs_uri=sample_gcs_artifacts.clean_uri,
         full_table_id=sample_config.full_staging_table_id,
         write_disposition=sample_config.write_disposition_staging,
         schema=mod.BQ_SCHEMA,
