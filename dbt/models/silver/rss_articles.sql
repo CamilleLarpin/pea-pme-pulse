@@ -14,7 +14,7 @@ with yahoo as (
         ticker_bourso,
         fetched_at,
         'yahoo_rss' as source,
-        safe.parse_timestamp('%a, %d %b %Y %H:%M:%S %z', published) as published_at
+        safe.parse_timestamp('%a, %d %b %Y %H:%M:%S %Z', published) as published_at
     from {{ source('bronze', 'yahoo_rss') }}
     where isin is not null
 ),
@@ -30,7 +30,7 @@ google_news as (
         ticker_bourso,
         fetched_at,
         'google_news_rss' as source,
-        safe.parse_timestamp('%a, %d %b %Y %H:%M:%S %z', published) as published_at
+        safe.parse_timestamp('%a, %d %b %Y %H:%M:%S %Z', published) as published_at
     from {{ source('bronze', 'google_news_rss') }}
     where isin is not null
 ),
