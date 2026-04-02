@@ -1,6 +1,6 @@
 # Prefect deployment — Bronze RSS ingestion
 # Deploy: prefect deploy --all
-# Worker: prefect worker start --pool bronze-rss-pool
+# Worker: prefect worker start --pool bronze-pool
 
 name: pea-pme-pulse
 prefect-version: "3.*"
@@ -23,7 +23,7 @@ deployments:
       cron: "0 0 * * *"
       timezone: "Europe/Paris"
     work_pool:
-      name: bronze-rss-pool
+      name: bronze-pool
       work_queue_name: default
       job_variables: {}
 
@@ -36,6 +36,6 @@ deployments:
       cron: "0 0 * * *"
       timezone: "Europe/Paris"
     work_pool:
-      name: bronze-rss-pool
+      name: bronze-pool
       work_queue_name: default
       job_variables: {}
