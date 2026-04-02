@@ -30,4 +30,4 @@ RUN pip install --upgrade pip \
     && pip install -e ".[dev]"
 
 # Entry point — updated when Prefect deployment is configured
-CMD ["python", "-m", "prefect", "worker", "start", "--pool", "bronze-rss-pool"]
+CMD ["python", "-m", "prefect", "worker", "start", "--pool", "bronze-pool"]
