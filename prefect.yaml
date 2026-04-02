@@ -3,7 +3,7 @@
 # Worker: prefect worker start --pool bronze-pool
 
 name: pea-pme-pulse
-prefect-version: "3.*"
+prefect-version: "3.6.24"
 
 build: null
 push: null
