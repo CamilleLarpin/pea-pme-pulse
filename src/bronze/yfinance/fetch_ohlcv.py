@@ -38,7 +38,7 @@ REFERENTIEL_PATH = ROOT / "referentiel" / "boursorama_peapme_final.csv"
 OVERRIDES_PATH   = ROOT / "referentiel" / "ticker_overrides.json"
 
 GCP_PROJECT_ID = "bootcamp-project-pea-pme"
-BQ_DATASET     = "yfinance_bronze"
+BQ_DATASET     = "bronze"
 BQ_TABLE       = "yahoo_ohlcv"
 BQ_TABLE_REF   = f"{GCP_PROJECT_ID}.{BQ_DATASET}.{BQ_TABLE}"
 
