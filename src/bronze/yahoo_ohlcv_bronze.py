@@ -21,8 +21,8 @@
 
 import json
 import time
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
-from datetime import date, datetime, timedelta, timezone
 
 import pandas as pd
 import yfinance as yf
@@ -200,7 +200,7 @@ def fetch_ohlcv(isin: str, yf_ticker: str, start_date: date | None = None) -> pd
 
         df["isin"]        = isin
         df["yf_ticker"]   = yf_ticker
-        df["ingested_at"] = datetime.now(timezone.utc)
+        df["ingested_at"] = datetime.now(UTC)
 
         return df
 
