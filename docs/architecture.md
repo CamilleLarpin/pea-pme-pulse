@@ -75,13 +75,13 @@ Flows live under `src/flows/` · deployment config in `prefect.yaml`.
 | `bronze-yahoo-rss` | `src/flows/bronze_yahoo_rss.py` | cron `0 0 * * *` Europe/Paris |
 | `bronze-google-news-rss` | `src/flows/bronze_google_news_rss.py` | cron `0 0 * * *` Europe/Paris |
 
-Workspace: `camille-larpin/pea-pme` on Prefect Cloud · work pool: `bronze-rss-pool` (Docker) · target: GCP e2-small
+Workspace: `camille-larpin/pea-pme` on Prefect Cloud · work pool: `bronze-pool` (Docker) · target: GCP e2-small
 
 Deploy:
 ```bash
-prefect work-pool create bronze-rss-pool --type docker
+prefect work-pool create bronze-pool --type docker
 prefect deploy --all
-prefect worker start --pool bronze-rss-pool   # on GCP e2-small
+prefect worker start --pool bronze-pool   # on GCP e2-small
 ```
 
 ---

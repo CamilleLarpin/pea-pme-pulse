@@ -1,6 +1,9 @@
 """Prefect flow — Bronze RSS ingestion (Google News)."""
 
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 import pandas as pd
 from prefect import flow, task, get_run_logger

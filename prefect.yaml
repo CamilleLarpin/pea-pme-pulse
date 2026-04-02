@@ -1,17 +1,21 @@
 # Prefect deployment — Bronze RSS ingestion
 # Deploy: prefect deploy --all
-# Worker: prefect worker start --pool bronze-rss-pool
+# Worker: prefect worker start --pool bronze-pool
 
 name: pea-pme-pulse
-prefect-version: "3.*"
+prefect-version: "3.6.24"
 
 build: null
 push: null
 
 pull:
   - prefect.deployments.steps.git_clone:
+      id: git_clone
       repository: https://github.com/CamilleLarpin/pea-pme-pulse.git
       branch: main
+  - prefect.deployments.steps.run_shell_script:
+      script: pip install -e ".[dev]"
+      directory: "{{ git_clone.directory }}"
 
 deployments:
   - name: bronze-yahoo-rss
@@ -23,7 +27,7 @@ deployments:
       cron: "0 0 * * *"
       timezone: "Europe/Paris"
     work_pool:
-      name: bronze-rss-pool
+      name: bronze-pool
       work_queue_name: default
       job_variables: {}
 
@@ -36,6 +40,6 @@ deployments:
       cron: "0 0 * * *"
       timezone: "Europe/Paris"
     work_pool:
-      name: bronze-rss-pool
+      name: bronze-pool
       work_queue_name: default
       job_variables: {}
