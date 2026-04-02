@@ -16,7 +16,7 @@ if _gcp_creds_json and not os.environ.get("GOOGLE_APPLICATION_CREDENTIALS"):
     os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = _tmp.name
 
 import pandas as pd
-from prefect import flow, task, get_run_logger
+from prefect import flow, get_run_logger, task
 
 REFERENTIEL_PATH = Path(__file__).parent.parent.parent / "referentiel" / "boursorama_peapme_final.csv"
 

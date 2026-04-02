@@ -2,6 +2,7 @@ help:
 	@echo "Available targets:"
 	@echo "  make lint       -> check code quality"
 	@echo "  make format     -> format code"
+	@echo "  make test       -> run tests"
 	@echo "  make gcp-auth   -> GCP login + ADC"
 	@echo "  make gcp-setup  -> login + ADC + projet"
 	@echo "  make gcp-check  -> check gcp configuration"
