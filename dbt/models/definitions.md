@@ -77,3 +77,15 @@ Fuzzy match confidence score (0–100) produced by rapidfuzz when matching the a
 {% docs feed_name %}
 Identifier of the specific Google News RSS feed the article was fetched from. Values: euronext_growth | pme_bourse_fr. Not present in yahoo_rss (single feed source).
 {% enddocs %}
+
+{% docs yf_ticker %}
+Yahoo Finance ticker symbol used to fetch OHLCV data (e.g. GFT.PA). Built from the Boursorama ticker by appending the exchange suffix (.PA for Euronext Paris). Primary key for yfinance API calls.
+{% enddocs %}
+
+{% docs date_cotation %}
+Trading date (DATE, YYYY-MM-DD) for which the OHLCV prices were recorded. Market days only — no entries for weekends or public holidays. Join key for time-series alignment with other sources.
+{% enddocs %}
+
+{% docs close_price %}
+Adjusted closing price for the session (EUR for Euronext Paris listings), as returned by Yahoo Finance. Used as the base for all Silver technical indicators (RSI, MACD, Bollinger Bands, SMA, EMA).
+{% enddocs %}

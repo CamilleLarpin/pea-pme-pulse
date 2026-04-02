@@ -3,12 +3,7 @@
 -- row_id: surrogate key on (lower(title), isin) — stable dedup key across sources
 -- published_at: parsed from RFC 2822 string (e.g. "Thu, 02 Apr 2026 15:30:00 GMT")
 
-{{ config(
-    materialized='incremental',
-    unique_key='row_id',
-    incremental_strategy='merge',
-    on_schema_change='fail',
-) }}
+
 
 with yahoo as (
     select
@@ -23,11 +18,11 @@ with yahoo as (
         fetched_at,
         'yahoo_rss' as source,
         safe.parse_timestamp('%a, %d %b %Y %H:%M:%S %Z', published) as published_at
-    from {{ source('bronze', 'yahoo_rss') }}
+    from `bootcamp-project-pea-pme`.`bronze`.`yahoo_rss`
     where isin is not null
-    {% if is_incremental() %}
-    and fetched_at > (select max(fetched_at) from {{ this }})
-    {% endif %}
+    
+    and fetched_at > (select max(fetched_at) from `bootcamp-project-pea-pme`.`silver`.`rss_articles`)
+    
 ),
 
 google_news as (
@@ -43,11 +38,11 @@ google_news as (
         fetched_at,
         'google_news_rss' as source,
         safe.parse_timestamp('%a, %d %b %Y %H:%M:%S %Z', published) as published_at
-    from {{ source('bronze', 'google_news_rss') }}
+    from `bootcamp-project-pea-pme`.`bronze`.`google_news_rss`
     where isin is not null
-    {% if is_incremental() %}
-    and fetched_at > (select max(fetched_at) from {{ this }})
-    {% endif %}
+    
+    and fetched_at > (select max(fetched_at) from `bootcamp-project-pea-pme`.`silver`.`rss_articles`)
+    
 ),
 
 unioned as (
