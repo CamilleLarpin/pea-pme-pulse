@@ -2,7 +2,7 @@
 
 import pandas as pd
 
-from bronze.rss_yahoo_fr import match_companies
+from bronze.fuzzy_match import match_companies
 
 REFERENTIEL = pd.DataFrame(
     [
