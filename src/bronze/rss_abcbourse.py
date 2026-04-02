@@ -41,8 +41,8 @@ def load_and_log_environment():
         - config (dict): A dictionary mapping environment variable names to their values.
     """
 
-    # Get current file's parent directory (3 levels up) to ensure we are in the project root
-    base_dir = Path(__file__).resolve().parents[3] 
+    # Get current file's parent directory (2 levels up) to ensure we are in the project root
+    base_dir = Path(__file__).resolve().parents[2]
     
     gcp_credential_json_file = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
     if not gcp_credential_json_file:
@@ -74,36 +74,34 @@ def load_and_log_environment():
     
     # Return the dictionary to the caller for further use in the pipeline
     return config
-    
-def reset_local_db():
+
+def load_local_db(filepath="abcbourse_data_raw.json"):
     """
-    Completely resets the local JSON database by overwriting it 
-    with an empty structure and returns an initial data dictionary.
+    Loads the existing database from a JSON file or initializes a new one.
     
+    This function ensures continuity for deduplication by reading previously 
+    ingested entries. If the file is missing or corrupted, it returns a 
+    fresh structure based on current RSS sources.
+
+    Args:
+        filepath (str): Path to the local JSON database file.
+        
     Returns:
-        dict: A dictionary mapping source keys to empty lists, 
-              ready for new RSS data ingestion.
+        dict: The loaded or initialized database dictionary.
+              Format: { "source_key": [ {item1}, {item2} ] }
     """
-    # Get current directory of the script to ensure we are writing to the correct location
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    config_path = os.path.join(script_dir, JSON_DB_PATH_SOURCE)
+    # Check if the persistence file exists to avoid FileNotFoundError
+    if os.path.exists(filepath):
+        try:
+            with open(filepath, 'r', encoding='utf-8') as f:
+                # Load historical data to populate the 'existing_guids' set in import_rss
+                return json.load(f)
+        except (json.JSONDecodeError, IOError) as e:
+            # Handle cases where the file might be empty, locked, or malformed
+            logger.error(f"Failed to load database ({e}). Initializing fresh state.")
     
-    # Define an empty structure for your new JSON: to prevents 'FileNotFoundError' in subsequent steps
-    empty_structure = {
-        "sources": [],
-        "last_updated": datetime.now().isoformat(),
-        "status": "initialized"
-    }
-
-    try:
-        # Using 'w' mode automatically truncates (empties) the file if it exists
-        with open(config_path, 'w', encoding='utf-8') as f:
-            json.dump(empty_structure, f, indent=4)           
-        logger.success(f"Local database reset and initialized at: {config_path}")
-    except Exception as e:
-        logger.exception(f"Failed to reset local database: {e}")
-
-   # Initialize structure if file is missing
+    # Create a dictionary with empty lists for each source key
+    # This prevents KeyErrors when the script runs for the very first time
     return {source['key']: [] for source in rss_sources}
 
 def save_local_db(data, filename=JSON_DB_PATH_SOURCE):
@@ -357,10 +355,9 @@ if __name__ == "__main__":
     try:
         logger.info("Pipeline 'ingestion-abcbourse-peapme' started.")
         env = load_and_log_environment()
-        print(f"DEBUG: Credenziali attive -> {os.getenv('GOOGLE_APPLICATION_CREDENTIALS')}")
-   
-        # Clear existing data to prevent duplicates
-        db_items = reset_local_db()
+
+        # Load existing data to prevent duplicates and to have a base for fuzzy matching
+        db_items = load_local_db()
     
         # fetching, deduplicating, and storing RSS entries
         import_rss(db_items)
