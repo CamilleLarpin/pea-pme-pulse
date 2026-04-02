@@ -2,7 +2,7 @@
 # Never commit profiles.yml — it contains local credentials.
 #
 # Prerequisites:
-#   pip install dbt-bigquery
+#   pip install -e ".[dev]"       # includes dbt-bigquery
 #   gcloud auth application-default login
 
 pea_pme_pulse:

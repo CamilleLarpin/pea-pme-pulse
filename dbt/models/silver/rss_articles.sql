@@ -1,6 +1,6 @@
 -- Silver: unified RSS articles from all sources
 -- Cleans and deduplicates Bronze RSS tables into a single company-matched article feed.
--- published_at: parsed from RFC 2822 string (e.g. "Thu, 02 Apr 2026 15:30:00 +0000")
+-- published_at: parsed from RFC 2822 string (e.g. "Thu, 02 Apr 2026 15:30:00 GMT")
 -- Dedup key: (lower(title), isin) — same article matched to same company across sources
 
 with yahoo as (
