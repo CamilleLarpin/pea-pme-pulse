@@ -18,7 +18,7 @@ deployments:
     version: "0.1.0"
     tags: ["bronze", "rss", "yahoo"]
     description: "Daily Bronze ingestion — Yahoo Finance FR RSS (midnight Paris)"
-    entrypoint: src/flows/bronze_rss.py:yahoo_rss_flow
+    entrypoint: src/flows/bronze_yahoo_rss.py:yahoo_rss_flow
     schedule:
       cron: "0 0 * * *"
       timezone: "Europe/Paris"
@@ -31,7 +31,7 @@ deployments:
     version: "0.1.0"
     tags: ["bronze", "rss", "google-news"]
     description: "Daily Bronze ingestion — Google News RSS (midnight Paris)"
-    entrypoint: src/flows/bronze_rss.py:google_news_rss_flow
+    entrypoint: src/flows/bronze_google_news_rss.py:google_news_rss_flow
     schedule:
       cron: "0 0 * * *"
       timezone: "Europe/Paris"
