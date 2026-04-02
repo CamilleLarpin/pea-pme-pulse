@@ -21,10 +21,10 @@ deployments:
   - name: bronze-yahoo-rss
     version: "0.1.0"
     tags: ["bronze", "rss", "yahoo"]
-    description: "Daily Bronze ingestion — Yahoo Finance FR RSS (midnight Paris)"
+    description: "Bronze ingestion every 4h — Yahoo Finance FR RSS"
     entrypoint: src/flows/bronze_yahoo_rss.py:yahoo_rss_flow
     schedule:
-      cron: "0 0 * * *"
+      cron: "0 */4 * * *"
       timezone: "Europe/Paris"
     work_pool:
       name: bronze-pool
@@ -36,10 +36,10 @@ deployments:
   - name: bronze-google-news-rss
     version: "0.1.0"
     tags: ["bronze", "rss", "google-news"]
-    description: "Daily Bronze ingestion — Google News RSS (midnight Paris)"
+    description: "Bronze ingestion every 4h — Google News RSS"
     entrypoint: src/flows/bronze_google_news_rss.py:google_news_rss_flow
     schedule:
-      cron: "0 0 * * *"
+      cron: "0 */4 * * *"
       timezone: "Europe/Paris"
     work_pool:
       name: bronze-pool
