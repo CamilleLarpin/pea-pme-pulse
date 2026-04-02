@@ -19,13 +19,12 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: "3.11"
-          cache: "poetry"
 
       - name: Install Poetry
         run: pip install poetry
 
       - name: Install dependencies
-        run: poetry sync --with dev
+        run: poetry install --extras dev --no-root
 
       - name: Run Ruff check
         run: poetry run ruff check .

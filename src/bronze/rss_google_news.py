@@ -12,12 +12,10 @@ from bronze.fuzzy_match import match_companies
 
 FEED_URLS = {
     "euronext_growth": (
-        "https://news.google.com/rss/search"
-        "?q=Euronext+Growth+France&hl=fr&gl=FR&ceid=FR:fr"
+        "https://news.google.com/rss/search?q=Euronext+Growth+France&hl=fr&gl=FR&ceid=FR:fr"
     ),
     "pme_bourse_fr": (
-        "https://news.google.com/rss/search"
-        "?q=bourse+PME+France+small+cap&hl=fr&gl=FR&ceid=FR:fr"
+        "https://news.google.com/rss/search?q=bourse+PME+France+small+cap&hl=fr&gl=FR&ceid=FR:fr"
     ),
 }
 
