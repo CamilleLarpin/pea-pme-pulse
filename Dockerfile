@@ -26,8 +26,9 @@ COPY pyproject.toml ./
 # Copy project source
 COPY . .
 
+# Dependency installation
 RUN pip install --upgrade pip \
     && pip install -e ".[dev]"
 
-# Entry point — updated when Prefect deployment is configured
-CMD ["python", "-m", "prefect", "worker", "start", "--pool", "bronze-pool"]
+# Generic entry point — updated when DBT deployment is configured
+CMD ["python", "-c", "print('Hello! Docker container is running successfully.')"]
