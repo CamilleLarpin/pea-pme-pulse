@@ -30,13 +30,14 @@ One dataset per layer, one table per source:
 project-pea-pme
 ├── bronze
 │   ├── yahoo_rss
+│   ├── google_news_rss
 │   ├── amf
 │   ├── abcbourse_rss
 │   └── boursorama
 ├── silver
-│   └── ... (naming convention TBD)
+│   └── rss_articles        # unified RSS feed (all sources, deduplicated)
 └── gold
-    └── ... (naming convention TBD)
+    └── score_news          # 45-day mention count per ISIN → normalized 1–10 (planned)
 ```
 
 ---
@@ -72,8 +73,8 @@ Flows live under `src/flows/` · deployment config in `prefect.yaml`.
 
 | Flow | File | Schedule |
 |---|---|---|
-| `bronze-yahoo-rss` | `src/flows/bronze_yahoo_rss.py` | cron `0 0 * * *` Europe/Paris |
-| `bronze-google-news-rss` | `src/flows/bronze_google_news_rss.py` | cron `0 0 * * *` Europe/Paris |
+| `bronze-yahoo-rss` | `src/flows/bronze_yahoo_rss.py` | cron `0 */4 * * *` Europe/Paris |
+| `bronze-google-news-rss` | `src/flows/bronze_google_news_rss.py` | cron `0 */4 * * *` Europe/Paris |
 
 Workspace: `camille-larpin/pea-pme` on Prefect Cloud · work pool: `bronze-pool` (Docker) · target: GCP e2-small
 
@@ -83,6 +84,39 @@ prefect work-pool create bronze-pool --type docker
 prefect deploy --all
 prefect worker start --pool bronze-pool   # on GCP e2-small
 ```
+
+---
+
+## Transformations — dbt
+
+Silver and Gold logic lives in `dbt/models/` as SQL files. Bronze tables are declared as dbt sources — dbt does not own them.
+
+### Conventions
+
+- **Bronze → Silver**: cleaning only — dedup, type casting, timestamp parsing, column standardisation · no enrichment, no scoring
+- **Silver → Gold**: enrichment and scoring — aggregations, LLM outputs, normalized scores
+- **Materialization**: all models are `table` (not view) — Silver and Gold are rebuilt on each run
+- **Schema routing**: `+schema: silver` / `+schema: gold` in `dbt_project.yml` writes directly to the matching BQ dataset · enforced by `macros/generate_schema_name.sql`
+- **Sources**: always reference Bronze tables via `{{ source('bronze', 'table_name') }}` — never hardcode BQ paths in models
+- **Tests**: every model has at minimum `not_null` on key columns · add `accepted_values` for enum columns
+
+### Models
+
+| Model | Dataset | Sources | Description |
+|---|---|---|---|
+| `rss_articles` | `silver` | `bronze.yahoo_rss`, `bronze.google_news_rss` | Unified RSS articles — deduplicated, timestamp parsed |
+| `score_news` | `gold` | `silver.rss_articles` | 45-day mention count per ISIN → normalized 1–10 (planned) |
+
+### Local dev
+
+```bash
+cd dbt
+dbt run        # rebuild all models
+dbt test       # run all tests
+dbt run --select silver.rss_articles   # run one model only
+```
+
+Production runs are triggered by Prefect after Bronze flows complete — not scheduled independently.
 
 ---
 

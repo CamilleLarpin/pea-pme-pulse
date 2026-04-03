@@ -1,4 +1,4 @@
-# Prefect deployment — Bronze RSS ingestion
+# Prefect deployment — Bronze RSS ingestion + Silver dbt orchestration
 # Deploy: prefect deploy --all
 # Worker: prefect worker start --pool bronze-pool
 
@@ -18,11 +18,11 @@ pull:
       directory: "{{ git_clone.directory }}"
 
 deployments:
-  - name: bronze-yahoo-rss
+  - name: bronze-silver-rss
     version: "0.1.0"
-    tags: ["bronze", "rss", "yahoo"]
-    description: "Bronze ingestion every 4h — Yahoo Finance FR RSS"
-    entrypoint: src/flows/bronze_yahoo_rss.py:yahoo_rss_flow
+    tags: ["bronze", "silver", "rss", "orchestrator"]
+    description: "Bronze RSS ingestion (Yahoo + Google News) → Silver dbt refresh, every 4h"
+    entrypoint: src/flows/silver_rss.py:bronze_silver_rss_flow
     schedule:
       cron: "0 */4 * * *"
       timezone: "Europe/Paris"
@@ -33,14 +33,23 @@ deployments:
         env:
           GOOGLE_APPLICATION_CREDENTIALS_JSON: "{{ prefect.blocks.secret.gcp-sa-key }}"
 
+  - name: bronze-yahoo-rss
+    version: "0.1.0"
+    tags: ["bronze", "rss", "yahoo"]
+    description: "Bronze ingestion (manual) — Yahoo Finance FR RSS"
+    entrypoint: src/flows/bronze_yahoo_rss.py:yahoo_rss_flow
+    work_pool:
+      name: bronze-pool
+      work_queue_name: default
+      job_variables:
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: "{{ prefect.blocks.secret.gcp-sa-key }}"
+
   - name: bronze-google-news-rss
     version: "0.1.0"
     tags: ["bronze", "rss", "google-news"]
-    description: "Bronze ingestion every 4h — Google News RSS"
+    description: "Bronze ingestion (manual) — Google News RSS"
     entrypoint: src/flows/bronze_google_news_rss.py:google_news_rss_flow
-    schedule:
-      cron: "0 */4 * * *"
-      timezone: "Europe/Paris"
     work_pool:
       name: bronze-pool
       work_queue_name: default
