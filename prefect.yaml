@@ -71,3 +71,18 @@ deployments:
       job_variables:
         env:
           GOOGLE_APPLICATION_CREDENTIALS_JSON: "{{ prefect.blocks.secret.gcp-sa-key }}"
+
+  - name: bronze-amf
+    version: "0.1.0"
+    tags: ["bronze", "amf"]
+    description: "Bronze ingestion AMF"
+    entrypoint: src/flows/bonze_amf_flux.py:amf_flux_flow
+    schedule: 
+      cron: "0 */4 * * *"
+      timezone: "Europe/Paris"
+    work_pool:
+      name: bronze-pool
+      work_queue_name: default
+      job_variables:
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: "{{ prefect.blocks.secret.gcp-sa-key }}"
