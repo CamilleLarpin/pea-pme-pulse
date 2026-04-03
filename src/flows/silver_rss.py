@@ -10,20 +10,21 @@ import sys
 import tempfile
 from pathlib import Path
 
+from prefect import flow, get_run_logger, task
+
+from flows.bronze_google_news_rss import google_news_rss_flow
+from flows.bronze_yahoo_rss import yahoo_rss_flow
+
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 # GCP credentials — same pattern as Bronze flows; Bronze imports below are no-ops if already set
 _gcp_creds_json = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS_JSON")
 if _gcp_creds_json and not os.environ.get("GOOGLE_APPLICATION_CREDENTIALS"):
-    _tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False)
-    _tmp.write(_gcp_creds_json)
-    _tmp.close()
-    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = _tmp.name
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as _tmp:
+        _tmp.write(_gcp_creds_json)
+        _tmp.close()
+        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = _tmp.name
 
-from prefect import flow, task, get_run_logger
-
-from flows.bronze_google_news_rss import google_news_rss_flow
-from flows.bronze_yahoo_rss import yahoo_rss_flow
 
 DBT_PROJECT_DIR = Path(__file__).parent.parent.parent / "dbt"
 GCP_PROJECT = "bootcamp-project-pea-pme"
@@ -35,9 +36,12 @@ def dbt_run_silver() -> None:
     keyfile = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
 
     cmd = [
-        "dbt", "run",
-        "--select", "silver.rss_articles",
-        "--project-dir", str(DBT_PROJECT_DIR),
+        "dbt",
+        "run",
+        "--select",
+        "silver.rss_articles",
+        "--project-dir",
+        str(DBT_PROJECT_DIR),
     ]
 
     if keyfile:
