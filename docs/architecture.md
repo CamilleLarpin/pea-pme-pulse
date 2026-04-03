@@ -63,27 +63,51 @@ gs://project_bucket/
 
 Flows live under `src/flows/` · deployment config in `prefect.yaml`.
 
+Workspace: `camille-larpin/pea-pme` on Prefect Cloud · work pool: `bronze-pool` (Prefect Managed — no VM needed)
+
 ### Conventions
 
 - **1 source = 1 flow** — each developer owns their own flow file for their data source · file naming: `bronze_<source>.py`
 - **@task decomposition** — each flow is split into `@task` steps: `fetch` → `dump_gcs` → `match_load_bq` · benefits: failed tasks are retried individually (no full re-run) · each step is visible with its own state and logs in the Prefect Cloud UI
 - **Source modules are Prefect-free** — `src/bronze/` contains pure Python · `@task` wrappers live in `src/flows/` only
+- **Deploy from `main` only** — Prefect pull step always clones `main`; a flow not merged cannot run in prod
 
 ### Flows
 
 | Flow | File | Schedule |
 |---|---|---|
-| `bronze-yahoo-rss` | `src/flows/bronze_yahoo_rss.py` | cron `0 */4 * * *` Europe/Paris |
-| `bronze-google-news-rss` | `src/flows/bronze_google_news_rss.py` | cron `0 */4 * * *` Europe/Paris |
+| `bronze-silver-rss` | `src/flows/silver_rss.py` | cron `0 */4 * * *` Europe/Paris (orchestrator) |
+| `bronze-yahoo-rss` | `src/flows/bronze_yahoo_rss.py` | manual only |
+| `bronze-google-news-rss` | `src/flows/bronze_google_news_rss.py` | manual only |
 
-Workspace: `camille-larpin/pea-pme` on Prefect Cloud · work pool: `bronze-pool` (Docker) · target: GCP e2-small
+### Adding a new flow
 
-Deploy:
+1. Create `src/flows/bronze_<source>.py` — follow the fetch / dump_gcs / match_load_bq task pattern; inject GCP credentials from `GOOGLE_APPLICATION_CREDENTIALS_JSON` env var (see `silver_rss.py:16-21` for the tempfile pattern)
+2. Add an entry in `prefect.yaml` — copy an existing block, update `name`, `entrypoint`, `tags`, `description`
+3. Merge to `main`, then deploy:
+
 ```bash
-prefect work-pool create bronze-pool --type docker
 prefect deploy --all
-prefect worker start --pool bronze-pool   # on GCP e2-small
 ```
+
+### Onboarding (first-time setup)
+
+**Prefect Cloud**:
+```bash
+prefect cloud login   # use the shared team email + password, select workspace camille-larpin/pea-pme
+```
+
+**GCP credentials (local dev only)**:
+```bash
+gcloud auth application-default login   # OAuth — no service account key needed locally
+```
+
+GCP credentials in production are handled automatically via the Prefect Secret `gcp-sa-key` — nothing to configure.
+
+### Testing a flow
+
+- **Local** (before merging): `python src/flows/bronze_<source>.py`
+- **Prefect Cloud** (after merging to `main`): `prefect deploy --all` → trigger manually from the Prefect Cloud UI
 
 ---
 
