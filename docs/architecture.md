@@ -94,8 +94,11 @@ prefect deploy --all
 
 **Prefect Cloud**:
 ```bash
-prefect cloud login   # use the shared team email + password, select workspace camille-larpin/pea-pme
+prefect cloud login
+# → log in with the shared team email + password
+# → select workspace: camille-larpin/pea-pme
 ```
+This stores credentials in `~/.prefect/profiles.toml`. All subsequent `prefect` commands (deploy, run, etc.) automatically target this workspace — no further config needed.
 
 **GCP credentials (local dev only)**:
 ```bash
