@@ -37,7 +37,7 @@ def task_load_local_db(filepath="abcbourse_data_raw.json"):
     Output:
         - db_items (dict): Dictionary containing historical RSS entries.
     """
-    from bronze.rss_abc_bourse import load_local_db
+    from bronze.rss_abcbourse import load_local_db
     return load_local_db(filepath)
 
 @task(name="abcbourse-fetch-rss", retries=2, retry_delay_seconds=30)
@@ -50,7 +50,7 @@ def task_import_rss(db_items: dict) -> dict:
     Output:
         - updated_db (dict): Database updated with new unique entries.
     """
-    from bronze.rss_abc_bourse import import_rss
+    from bronze.rss_abcbourse import import_rss
     # Note: import_rss modifies the dictionary in-place in the original script
     import_rss(db_items)
     return db_items
@@ -66,7 +66,7 @@ def task_save_local_db(data: dict, filename: str):
     Output:
         - None
     """
-    from bronze.rss_abc_bourse import save_local_db
+    from bronze.rss_abcbourse import save_local_db
     save_local_db(data, filename)
 
 @task(name="abcbourse-match-fuzzy", retries=1)
@@ -80,7 +80,7 @@ def task_filter_fuzzy(db_items: dict, referentiel: pd.DataFrame) -> dict:
     Output:
         - filtered_db (dict): Only entries that successfully matched a target company.
     """
-    from bronze.rss_abc_bourse import filter_rss_entries_fuzzy
+    from bronze.rss_abcbourse import filter_rss_entries_fuzzy
     return filter_rss_entries_fuzzy(db_items, referentiel)
 
 @task(name="abcbourse-upload-gcs")
@@ -94,7 +94,7 @@ def task_upload_gcs(local_path: str, bucket: str):
     Output:
         - success (bool): Result of the upload operation.
     """
-    from bronze.rss_abc_bourse import upload_to_bucket
+    from bronze.rss_abcbourse import upload_to_bucket
     upload_to_bucket(local_path, bucket, local_path)
 
 @task(name="abcbourse-load-bigquery")
@@ -109,7 +109,7 @@ def task_load_bq(filtered_items: dict, project_id: str, dataset_id: str):
     Output:
         - None
     """
-    from bronze.rss_abc_bourse import upload_full_json_to_bigquery
+    from bronze.rss_abcbourse import upload_full_json_to_bigquery
     upload_full_json_to_bigquery(filtered_items, project_id, dataset_id)
 
 # --- FLOW ---
