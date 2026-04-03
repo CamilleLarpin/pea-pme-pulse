@@ -24,6 +24,7 @@ REFERENTIEL_PATH = Path(__file__).parent.parent.parent / os.environ.get("GCS_SOU
 
 # --- TASKS ---
 
+
 @task(name="abcbourse-load-local-db")
 def task_load_local_db(filepath="abcbourse_data_raw.json"):
     """
