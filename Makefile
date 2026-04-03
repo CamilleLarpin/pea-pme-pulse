@@ -1,6 +1,9 @@
 help:
 	@echo "Available targets:"
+	@echo "  make install    -> install dependencies"
 	@echo "  make lint       -> check code quality"
+	@echo "  make lint-fix   -> fix code quality"
+	@echo "  make lock       -> lock dependencies"
 	@echo "  make format     -> format code"
 	@echo "  make test       -> run tests"
 	@echo "  make gcp-auth   -> GCP login + ADC"
@@ -8,9 +11,10 @@ help:
 	@echo "  make gcp-check  -> check gcp configuration"
 	@echo "  make gcp-reset  -> reset ADC authentication and unset project"
 
-.PHONY: lint lint-fix format test quality gcp-setup gcp-auth gcp-check gcp-reset
+.PHONY: install lint lint-fix lock format test quality gcp-setup gcp-auth gcp-check gcp-reset
 
 install:
+	poetry install --no-root
 
 lint:
 	poetry run ruff check .
@@ -24,7 +28,10 @@ format:
 test:
 	poetry run pytest -q
 
-quality: lint-fix format test
+lock:
+	poetry lock
+
+quality: lock install lint-fix format test
 
 clean:
 
