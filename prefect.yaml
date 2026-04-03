@@ -56,3 +56,18 @@ deployments:
       job_variables:
         env:
           GOOGLE_APPLICATION_CREDENTIALS_JSON: "{{ prefect.blocks.secret.gcp-sa-key }}"
+
+  - name: bronze-yfinance-ohlcv
+    version: "0.1.0"
+    tags: ["bronze", "ohlcv", "yfinance"]
+    description: "Bronze ingestion daily at 8h Paris — yfinance OHLCV for all PEA-PME ISINs"
+    entrypoint: src/flows/bronze_yfinance_ohlcv.py:yfinance_ohlcv_flow
+    schedule:
+      cron: "0 8 * * 1-5"
+      timezone: "Europe/Paris"
+    work_pool:
+      name: bronze-pool
+      work_queue_name: default
+      job_variables:
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: "{{ prefect.blocks.secret.gcp-sa-key }}"
