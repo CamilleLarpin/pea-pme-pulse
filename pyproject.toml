@@ -21,6 +21,7 @@ dependencies = [
     "db-dtypes",
     "google-api-core (>=2.30.1,<3.0.0)",
     "google-cloud-core (>=2.5.1,<3.0.0)",
+    "dbt-bigquery",
 ]
 
 [project.optional-dependencies]

@@ -1,6 +1,11 @@
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
 from prefect import flow, get_run_logger, task
+
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 from bronze.amf_ingest import (
     Config,

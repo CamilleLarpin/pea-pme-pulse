@@ -60,3 +60,25 @@ pip install -e ".[dev]"
 # Only if you don't have .env yet
 cp -n .env.example .env
 ```
+
+### dbt (Silver / Gold)
+
+```bash
+# Authenticate with GCP
+gcloud auth application-default login
+
+# Set up your local dbt profile
+cp dbt/profiles.yml.example ~/.dbt/profiles.yml
+
+# Verify connection
+cd dbt && dbt debug
+
+# Run Silver models
+dbt run
+
+# Run tests
+dbt test
+```
+
+> Each developer uses their own `~/.dbt/profiles.yml` with their own GCP credentials — never commit it.
+> Production runs are orchestrated by Prefect.
