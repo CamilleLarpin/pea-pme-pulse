@@ -78,7 +78,7 @@ pyenv exec python scripts/run_google_news_rss.py
 
 ## Via Prefect (production)
 
-Flows déployés sous le work pool `bronze-rss-pool` · schedule automatique 17:30 UTC lun–ven.
+Flows déployés sous le work pool `bronze-pool` · schedule automatique 17:30 UTC lun–ven.
 
 **Lancer manuellement un run Prefect :**
 ```bash
@@ -92,5 +92,5 @@ prefect flow-run ls
 
 **Démarrer le worker (sur GCP e2-small) :**
 ```bash
-prefect worker start --pool bronze-rss-pool
+prefect worker start --pool bronze-pool
 ```
