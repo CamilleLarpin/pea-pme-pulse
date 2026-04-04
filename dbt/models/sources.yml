@@ -9,3 +9,5 @@ sources:
         description: "Raw matched Yahoo Finance FR RSS articles — fetched daily"
       - name: google_news_rss
         description: "Raw matched Google News RSS articles — fetched daily"
+      - name: amf
+        description: "Raw AMF regulatory documents ingested from info-financiere.gouv.fr"

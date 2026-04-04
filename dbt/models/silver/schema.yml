@@ -9,7 +9,7 @@ models:
       - name: row_id
         description: "Surrogate key: hex(md5(lower(title) || '|' || isin)) — stable dedup key"
         tests:
-          - not_null
+          - not_null          
           - unique
       - name: isin
         description: "ISIN of the matched PEA-PME company"
@@ -34,3 +34,44 @@ models:
         description: "Fuzzy match confidence score (0–100)"
       - name: ticker_bourso
         description: "Boursorama ticker of the matched company"
+
+  - name: amf_documents
+    description: >
+      Cleaned AMF regulatory documents from bronze.amf.
+      Deduplicated by record_id, keeping the latest ingested row.
+      Silver layer contains only cleaned and standardized records.
+    columns:
+      - name: record_id
+        description: "Unique AMF record identifier"
+        tests:
+          - not_null
+          - unique
+      - name: isin
+        description: "ISIN of the matched company"
+        tests:
+          - not_null
+      - name: societe
+        description: "Company name from AMF source"
+      - name: publication_ts
+        description: "Publication timestamp parsed in bronze"
+      - name: pdf_url
+        description: "AMF document PDF URL"
+      - name: titre
+        description: "Document title"
+      - name: sous_type
+        description: "AMF sub-type of information"
+      - name: type_information
+        description: "AMF information type"
+      - name: source
+        description: "Source system name"
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['amf']
+      - name: run_id
+        description: "Ingestion run identifier"
+      - name: ingestion_ts
+        description: "Timestamp when the row was ingested"
+        tests:
+          - not_null
