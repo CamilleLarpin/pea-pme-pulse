@@ -11,6 +11,7 @@ import tempfile
 from pathlib import Path
 
 from prefect import flow, get_run_logger, task
+from prefect.deployments import run_deployment
 
 from flows.bronze_google_news_rss import google_news_rss_flow
 from flows.bronze_yahoo_rss import yahoo_rss_flow
@@ -24,7 +25,6 @@ if _gcp_creds_json and not os.environ.get("GOOGLE_APPLICATION_CREDENTIALS"):
         _tmp.write(_gcp_creds_json)
         _tmp.close()
         os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = _tmp.name
-
 
 DBT_PROJECT_DIR = Path(__file__).parent.parent.parent / "dbt"
 GCP_PROJECT = "bootcamp-project-pea-pme"
@@ -88,7 +88,9 @@ def bronze_silver_rss_flow() -> None:
     yahoo_rss_flow()
     google_news_rss_flow()
     dbt_run_silver()
-    logger.info("bronze-silver-rss complete")
+    logger.info("bronze-silver-rss complete — triggering silver-gold-rss")
+    run_deployment("silver-gold-rss/silver-gold-rss", timeout=0)
+    logger.info("silver-gold-rss triggered")
 
 
 if __name__ == "__main__":

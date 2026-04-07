@@ -1,0 +1,34 @@
+version: 2
+
+models:
+  - name: score_news
+    description: >
+      Daily investment score per PEA-PME company (1–10).
+      Based on 45-day rolling average Groq sentiment of RSS articles.
+      PERCENT_RANK normalized: 1 = weakest news signal, 10 = strongest.
+    columns:
+      - name: isin
+        description: "ISIN of the PEA-PME company"
+        tests:
+          - not_null
+          - unique
+      - name: ticker_bourso
+        description: "Boursorama ticker"
+      - name: matched_name
+        description: "Company name from référentiel"
+      - name: mention_count_45d
+        description: "Number of scored articles in the 45-day window"
+        tests:
+          - not_null
+      - name: avg_sentiment_45d
+        description: "Average Groq sentiment score (0–10) over 45-day window"
+        tests:
+          - not_null
+      - name: investment_score
+        description: "Normalized investment score 1–10 via PERCENT_RANK on avg_sentiment_45d"
+        tests:
+          - not_null
+      - name: score_date
+        description: "Date the score was computed (Europe/Paris)"
+        tests:
+          - not_null

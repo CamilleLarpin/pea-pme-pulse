@@ -11,3 +11,10 @@ sources:
         description: "Raw matched Google News RSS articles — fetched daily"
       - name: amf
         description: "Raw AMF regulatory documents ingested from info-financiere.gouv.fr"
+
+  - name: gold
+    database: bootcamp-project-pea-pme
+    schema: gold
+    tables:
+      - name: article_sentiment
+        description: "Groq-scored Silver RSS articles — sentiment 0–10 per article, written by Prefect flow"
