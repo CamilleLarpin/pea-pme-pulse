@@ -6,9 +6,9 @@ sources:
     schema: bronze
     tables:
       - name: yahoo_rss
-        description: "Raw matched Yahoo Finance FR RSS articles — fetched daily"
+        description: "Raw matched Yahoo Finance FR RSS articles — fetched every 4h"
       - name: google_news_rss
-        description: "Raw matched Google News RSS articles — fetched daily"
+        description: "Raw matched Google News RSS articles — fetched every 4h"
       - name: amf
         description: "Raw AMF regulatory documents ingested from info-financiere.gouv.fr"
 
@@ -17,4 +17,29 @@ sources:
     schema: gold
     tables:
       - name: article_sentiment
-        description: "Groq-scored Silver RSS articles — sentiment 0–10 per article, written by Prefect flow"
+        description: >
+          One row per scored RSS article. Written by the Prefect silver-gold-rss flow via Groq.
+          Grain: one row per (row_id) — no duplicates enforced by LEFT JOIN on row_id before scoring.
+          Use this table to understand individual article signals or to audit scoring outputs.
+          For aggregated company scores, use gold.score_news instead.
+        columns:
+          - name: row_id
+            description: "{{ doc('row_id') }}"
+          - name: isin
+            description: "{{ doc('isin') }}"
+          - name: ticker_bourso
+            description: "{{ doc('ticker_bourso') }}"
+          - name: matched_name
+            description: "{{ doc('matched_name') }}"
+          - name: title
+            description: "Original article title from the RSS feed, as ingested in Silver. Not cleaned."
+          - name: published_at
+            description: "{{ doc('published_at') }}"
+          - name: sentiment_score
+            description: "{{ doc('sentiment_score') }}"
+          - name: sentiment_reason
+            description: "{{ doc('sentiment_reason') }}"
+          - name: groq_model
+            description: "{{ doc('groq_model') }}"
+          - name: scored_at
+            description: "{{ doc('scored_at') }}"
