@@ -2,9 +2,6 @@
 
 import json
 
-import pandas as pd
-import pytest
-
 from bronze.yahoo_ohlcv_bronze import isin_to_yf_ticker, load_overrides, load_referentiel
 
 # ---------------------------------------------------------------------------
@@ -16,9 +13,7 @@ def test_load_referentiel_valid(tmp_path):
     """Charge un CSV valide et retourne les colonnes name + isin."""
     csv = tmp_path / "ref.csv"
     csv.write_text(
-        "name,ticker_bourso,isin\n"
-        "COMPANY A,1rPA,FR0010557264\n"
-        "COMPANY B,1rPB,FR0004040608\n"
+        "name,ticker_bourso,isin\nCOMPANY A,1rPA,FR0010557264\nCOMPANY B,1rPB,FR0004040608\n"
     )
     df = load_referentiel(csv)
     assert list(df.columns) == ["name", "isin"]
@@ -28,11 +23,7 @@ def test_load_referentiel_valid(tmp_path):
 def test_load_referentiel_filters_nan_isin(tmp_path):
     """Les lignes avec ISIN NaN sont exclues."""
     csv = tmp_path / "ref.csv"
-    csv.write_text(
-        "name,ticker_bourso,isin\n"
-        "COMPANY A,1rPA,FR0010557264\n"
-        "COMPANY B,1rPB,\n"
-    )
+    csv.write_text("name,ticker_bourso,isin\nCOMPANY A,1rPA,FR0010557264\nCOMPANY B,1rPB,\n")
     df = load_referentiel(csv)
     assert len(df) == 1
     assert df.iloc[0]["isin"] == "FR0010557264"
@@ -56,9 +47,7 @@ def test_load_referentiel_deduplicates_isin(tmp_path):
     """Les doublons ISIN sont dédupliqués — une seule ligne par ISIN."""
     csv = tmp_path / "ref.csv"
     csv.write_text(
-        "name,ticker_bourso,isin\n"
-        "COMPANY A,1rPA,FR0010557264\n"
-        "COMPANY A BIS,1rPABIS,FR0010557264\n"
+        "name,ticker_bourso,isin\nCOMPANY A,1rPA,FR0010557264\nCOMPANY A BIS,1rPABIS,FR0010557264\n"
     )
     df = load_referentiel(csv)
     assert len(df) == 1
@@ -117,6 +106,7 @@ def test_isin_to_yf_ticker_unknown_isin(monkeypatch):
 
 def test_isin_to_yf_ticker_yahoo_exception(monkeypatch):
     """Retourne None si Yahoo lève une exception."""
+
     def raise_exc(isin):
         raise ValueError("Invalid ISIN")
 

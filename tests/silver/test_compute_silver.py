@@ -2,7 +2,6 @@
 
 import numpy as np
 import pandas as pd
-import pytest
 
 from silver.compute_silver import compute_indicators
 
@@ -37,13 +36,13 @@ def _make_ohlcv(n: int, seed: int = 42) -> pd.DataFrame:
 
     return pd.DataFrame(
         {
-            "Date":     pd.date_range("2020-01-01", periods=n, freq="B"),
-            "Open":     close * rng.uniform(0.99, 1.01, n),
-            "High":     close * rng.uniform(1.00, 1.02, n),
-            "Low":      close * rng.uniform(0.98, 1.00, n),
-            "Close":    close,
-            "Volume":   rng.integers(10_000, 1_000_000, n),
-            "isin":     "FR0000000001",
+            "Date": pd.date_range("2020-01-01", periods=n, freq="B"),
+            "Open": close * rng.uniform(0.99, 1.01, n),
+            "High": close * rng.uniform(1.00, 1.02, n),
+            "Low": close * rng.uniform(0.98, 1.00, n),
+            "Close": close,
+            "Volume": rng.integers(10_000, 1_000_000, n),
+            "isin": "FR0000000001",
             "yf_ticker": "TEST.PA",
         }
     )

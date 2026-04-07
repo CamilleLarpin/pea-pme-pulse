@@ -26,7 +26,7 @@
 # depuis le Bronze — safe à relancer à tout moment.
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pandas as pd
 from google.cloud import bigquery
@@ -47,22 +47,22 @@ BQ_SILVER_TABLE = f"{GCP_PROJECT_ID}.yfinance_silver.yahoo_ohlcv"
 # on fixe les types ici pour garantir la stabilité du contrat de données
 # vers la couche Gold.
 SILVER_SCHEMA = [
-    bigquery.SchemaField("Date",        "DATETIME"),
-    bigquery.SchemaField("Open",        "FLOAT"),
-    bigquery.SchemaField("High",        "FLOAT"),
-    bigquery.SchemaField("Low",         "FLOAT"),
-    bigquery.SchemaField("Close",       "FLOAT"),
-    bigquery.SchemaField("Volume",      "INTEGER"),
-    bigquery.SchemaField("isin",        "STRING"),
-    bigquery.SchemaField("yf_ticker",   "STRING"),
-    bigquery.SchemaField("RSI_14",      "FLOAT"),
-    bigquery.SchemaField("MACD",        "FLOAT"),
+    bigquery.SchemaField("Date", "DATETIME"),
+    bigquery.SchemaField("Open", "FLOAT"),
+    bigquery.SchemaField("High", "FLOAT"),
+    bigquery.SchemaField("Low", "FLOAT"),
+    bigquery.SchemaField("Close", "FLOAT"),
+    bigquery.SchemaField("Volume", "INTEGER"),
+    bigquery.SchemaField("isin", "STRING"),
+    bigquery.SchemaField("yf_ticker", "STRING"),
+    bigquery.SchemaField("RSI_14", "FLOAT"),
+    bigquery.SchemaField("MACD", "FLOAT"),
     bigquery.SchemaField("MACD_signal", "FLOAT"),
-    bigquery.SchemaField("BB_upper",    "FLOAT"),
-    bigquery.SchemaField("BB_lower",    "FLOAT"),
-    bigquery.SchemaField("SMA_50",      "FLOAT"),
-    bigquery.SchemaField("SMA_200",     "FLOAT"),
-    bigquery.SchemaField("EMA_20",      "FLOAT"),
+    bigquery.SchemaField("BB_upper", "FLOAT"),
+    bigquery.SchemaField("BB_lower", "FLOAT"),
+    bigquery.SchemaField("SMA_50", "FLOAT"),
+    bigquery.SchemaField("SMA_200", "FLOAT"),
+    bigquery.SchemaField("EMA_20", "FLOAT"),
     bigquery.SchemaField("computed_at", "DATETIME"),
 ]
 
@@ -135,21 +135,21 @@ def compute_indicators(df: pd.DataFrame) -> pd.DataFrame:
     """
     close = df["Close"]
 
-    df["RSI_14"]      = RSIIndicator(close=close, window=14).rsi()
+    df["RSI_14"] = RSIIndicator(close=close, window=14).rsi()
 
-    macd              = MACD(close=close)
-    df["MACD"]        = macd.macd()
+    macd = MACD(close=close)
+    df["MACD"] = macd.macd()
     df["MACD_signal"] = macd.macd_signal()
 
-    bb                = BollingerBands(close=close, window=20, window_dev=2)
-    df["BB_upper"]    = bb.bollinger_hband()
-    df["BB_lower"]    = bb.bollinger_lband()
+    bb = BollingerBands(close=close, window=20, window_dev=2)
+    df["BB_upper"] = bb.bollinger_hband()
+    df["BB_lower"] = bb.bollinger_lband()
 
-    df["SMA_50"]      = SMAIndicator(close=close, window=50).sma_indicator()
-    df["SMA_200"]     = SMAIndicator(close=close, window=200).sma_indicator()
-    df["EMA_20"]      = EMAIndicator(close=close, window=20).ema_indicator()
+    df["SMA_50"] = SMAIndicator(close=close, window=50).sma_indicator()
+    df["SMA_200"] = SMAIndicator(close=close, window=200).sma_indicator()
+    df["EMA_20"] = EMAIndicator(close=close, window=20).ema_indicator()
 
-    df["computed_at"] = datetime.now(timezone.utc).replace(tzinfo=None)
+    df["computed_at"] = datetime.now(UTC).replace(tzinfo=None)
 
     return df
 
@@ -194,7 +194,7 @@ def run() -> None:
     log.info(f"Destination : {BQ_SILVER_TABLE}")
 
     client = bigquery.Client(project=GCP_PROJECT_ID)
-    isins  = load_bronze_isins(client)
+    isins = load_bronze_isins(client)
 
     success, failed = [], []
     total = len(isins)
