@@ -20,12 +20,9 @@ Thumbs.db
 
 # Packaging
 pea_pme_pulse.egg-info/
-<<<<<<< HEAD
 data/
-=======
 
 # dbt
 dbt/target/
 dbt/dbt_packages/
 dbt/logs/
->>>>>>> d2d3b70 (feat: init dbt project + silver.rss_articles model)
