@@ -10,13 +10,16 @@ import sys
 import tempfile
 from pathlib import Path
 
-from prefect import flow, get_run_logger, task
-from prefect.deployments import run_deployment
+# Must be before project imports — ensures src/ is on sys.path in the Prefect
+# managed environment where pip editable-install .pth files aren't picked up
+# by an already-running Python process.
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from flows.bronze_google_news_rss import google_news_rss_flow
-from flows.bronze_yahoo_rss import yahoo_rss_flow
+from prefect import flow, get_run_logger, task  # noqa: E402
+from prefect.deployments import run_deployment  # noqa: E402
 
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
+from flows.bronze_google_news_rss import google_news_rss_flow  # noqa: E402
+from flows.bronze_yahoo_rss import yahoo_rss_flow  # noqa: E402
 
 # GCP credentials — same pattern as Bronze flows; Bronze imports below are no-ops if already set
 _gcp_creds_json = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS_JSON")
