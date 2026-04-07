@@ -90,7 +90,7 @@ deployments:
     version: "0.1.0"
     tags: ["bronze", "amf"]
     description: "Bronze ingestion AMF"
-    entrypoint: src/flows/bonze_amf_flux.py:amf_flux_flow
+    entrypoint: src/flows/bronze_amf_flux.py:amf_flux_flow
     schedule: 
       cron: "0 */4 * * *"
       timezone: "Europe/Paris"
