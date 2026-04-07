@@ -96,7 +96,7 @@ deployments:
     description: "Bronze ingestion every 4h — ABCBourse RSS"
     entrypoint: src/flows/bronze_abcbourse_rss.py:abcbourse_rss_flow
     schedule:
-     cron: "0 8 * * 1-5"
+      cron: "0 8 * * 1-5"
       timezone: "Europe/Paris"
     work_pool:
       name: bronze-pool
