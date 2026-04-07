@@ -12,7 +12,7 @@ pull:
   - prefect.deployments.steps.git_clone:
       id: git_clone
       repository: https://github.com/CamilleLarpin/pea-pme-pulse.git
-      branch: feat/gold-sentiment-scoring
+      branch: main
   - prefect.deployments.steps.run_shell_script:
       script: pip install -e ".[dev]"
       directory: "{{ git_clone.directory }}"
