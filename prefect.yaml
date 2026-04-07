@@ -62,6 +62,7 @@ deployments:
     tags: ["bronze", "ohlcv", "yfinance"]
     description: "Bronze ingestion daily at 8h Paris — yfinance OHLCV for all PEA-PME ISINs"
     entrypoint: src/flows/bronze_yfinance_ohlcv.py:yfinance_ohlcv_flow
+    concurrency_limit: 1
     schedule:
       cron: "0 8 * * 1-5"
       timezone: "Europe/Paris"
