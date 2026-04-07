@@ -2,7 +2,7 @@
 #
 # Pipeline Silver — Indicateurs techniques OHLCV PEA-PME
 # Source      : BigQuery → bronze.yfinance_ohlcv
-# Destination : BigQuery → yfinance_silver.yahoo_ohlcv
+# Destination : BigQuery → silver.yahoo_ohlcv
 #
 # Indicateurs calculés via `ta` :
 #   RSI_14       : Relative Strength Index (14 jours)
@@ -41,13 +41,13 @@ from ta.volatility import BollingerBands
 GCP_PROJECT_ID = "bootcamp-project-pea-pme"
 
 BQ_BRONZE_TABLE = f"{GCP_PROJECT_ID}.bronze.yfinance_ohlcv"
-BQ_SILVER_TABLE = f"{GCP_PROJECT_ID}.yfinance_silver.yahoo_ohlcv"
+BQ_SILVER_TABLE = f"{GCP_PROJECT_ID}.silver.yahoo_ohlcv"
 
 # Schéma explicite Silver — contrairement au Bronze (autodetect),
 # on fixe les types ici pour garantir la stabilité du contrat de données
 # vers la couche Gold.
 SILVER_SCHEMA = [
-    bigquery.SchemaField("Date", "DATETIME"),
+    bigquery.SchemaField("Date", "DATE"),
     bigquery.SchemaField("Open", "FLOAT"),
     bigquery.SchemaField("High", "FLOAT"),
     bigquery.SchemaField("Low", "FLOAT"),
@@ -167,7 +167,7 @@ def write_to_bigquery(
 
     ISINs suivants (first_write=False) : WRITE_APPEND — accumule.
 
-    Le dataset `yfinance_silver` doit exister dans BQ avant le premier run
+    Le dataset `silver` doit exister dans BQ avant le premier run
     (créer manuellement via la console GCP ou `bq mk`).
     """
     disposition = (

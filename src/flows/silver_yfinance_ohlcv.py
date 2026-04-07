@@ -2,7 +2,7 @@
 
 Reads bronze.yfinance_ohlcv from BigQuery, computes technical indicators
 (RSI_14, MACD, BB, SMA_50/200, EMA_20) via compute_silver.run(), and writes
-results to yfinance_silver.yahoo_ohlcv.
+results to silver.yahoo_ohlcv.
 
 Designed to run after bronze-yfinance-ohlcv completes each weekday morning.
 """
@@ -32,7 +32,7 @@ def yfinance_silver_compute() -> None:
     Délègue entièrement à silver.compute_silver.run() qui gère :
     - Lecture de bronze.yfinance_ohlcv par ISIN depuis BQ
     - Calcul RSI_14, MACD, MACD_signal, BB_upper/lower, SMA_50, SMA_200, EMA_20
-    - Écriture dans yfinance_silver.yahoo_ohlcv (WRITE_TRUNCATE premier ISIN,
+    - Écriture dans silver.yahoo_ohlcv (WRITE_TRUNCATE premier ISIN,
       WRITE_APPEND suivants)
     """
     from silver.compute_silver import run
