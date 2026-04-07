@@ -45,6 +45,19 @@ deployments:
         env:
           GOOGLE_APPLICATION_CREDENTIALS_JSON: "{{ prefect.blocks.secret.gcp-sa-key }}"
 
+  - name: silver-gold-rss
+    version: "0.1.0"
+    tags: ["silver", "gold", "rss", "sentiment"]
+    description: "Score unscored Silver RSS articles via Groq → write gold.article_sentiment → dbt gold.score_news"
+    entrypoint: src/flows/gold_sentiment.py:silver_gold_rss_flow
+    work_pool:
+      name: bronze-pool
+      work_queue_name: default
+      job_variables:
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: "{{ prefect.blocks.secret.gcp-sa-key }}"
+          GROQ_API_KEY: "{{ prefect.blocks.secret.groq-api-key }}"
+
   - name: bronze-google-news-rss
     version: "0.1.0"
     tags: ["bronze", "rss", "google-news"]
@@ -77,7 +90,7 @@ deployments:
     version: "0.1.0"
     tags: ["bronze", "amf"]
     description: "Bronze ingestion AMF"
-    entrypoint: src/flows/bonze_amf_flux.py:amf_flux_flow
+    entrypoint: src/flows/bronze_amf_flux.py:amf_flux_flow
     schedule: 
       cron: "0 */4 * * *"
       timezone: "Europe/Paris"

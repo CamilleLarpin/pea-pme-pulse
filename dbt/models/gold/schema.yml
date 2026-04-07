@@ -1,0 +1,36 @@
+version: 2
+
+models:
+  - name: score_news
+    description: >
+      Daily investment news score per PEA-PME company — one row per ISIN, rebuilt on every pipeline run.
+      Grain: one row per ISIN (current snapshot, not historical).
+      Methodology: 45-day rolling average of article sentiment_score, normalized via PERCENT_RANK to a 1–10 scale.
+      Use this table to rank companies by news signal strength, identify top movers, or feed a composite scoring model.
+      Do not use for historical trend analysis — this table holds the current snapshot only; use gold.article_sentiment for time series.
+    columns:
+      - name: isin
+        description: "{{ doc('isin') }}"
+        tests:
+          - not_null
+          - unique
+      - name: ticker_bourso
+        description: "{{ doc('ticker_bourso') }}"
+      - name: matched_name
+        description: "{{ doc('matched_name') }}"
+      - name: mention_count_45d
+        description: "{{ doc('mention_count_45d') }}"
+        tests:
+          - not_null
+      - name: avg_sentiment_45d
+        description: "{{ doc('avg_sentiment_45d') }}"
+        tests:
+          - not_null
+      - name: investment_score
+        description: "{{ doc('investment_score') }}"
+        tests:
+          - not_null
+      - name: score_date
+        description: "{{ doc('score_date') }}"
+        tests:
+          - not_null

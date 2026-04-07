@@ -10,12 +10,16 @@ import sys
 import tempfile
 from pathlib import Path
 
-from prefect import flow, get_run_logger, task
+# Must be before project imports — ensures src/ is on sys.path in the Prefect
+# managed environment where pip editable-install .pth files aren't picked up
+# by an already-running Python process.
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from flows.bronze_google_news_rss import google_news_rss_flow
-from flows.bronze_yahoo_rss import yahoo_rss_flow
+from prefect import flow, get_run_logger, task  # noqa: E402
+from prefect.deployments import run_deployment  # noqa: E402
 
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
+from flows.bronze_google_news_rss import google_news_rss_flow  # noqa: E402
+from flows.bronze_yahoo_rss import yahoo_rss_flow  # noqa: E402
 
 # GCP credentials — same pattern as Bronze flows; Bronze imports below are no-ops if already set
 _gcp_creds_json = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS_JSON")
@@ -24,7 +28,6 @@ if _gcp_creds_json and not os.environ.get("GOOGLE_APPLICATION_CREDENTIALS"):
         _tmp.write(_gcp_creds_json)
         _tmp.close()
         os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = _tmp.name
-
 
 DBT_PROJECT_DIR = Path(__file__).parent.parent.parent / "dbt"
 GCP_PROJECT = "bootcamp-project-pea-pme"
@@ -88,7 +91,9 @@ def bronze_silver_rss_flow() -> None:
     yahoo_rss_flow()
     google_news_rss_flow()
     dbt_run_silver()
-    logger.info("bronze-silver-rss complete")
+    logger.info("bronze-silver-rss complete — triggering silver-gold-rss")
+    run_deployment("silver-gold-rss/silver-gold-rss", timeout=0)
+    logger.info("silver-gold-rss triggered")
 
 
 if __name__ == "__main__":

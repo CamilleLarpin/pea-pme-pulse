@@ -1,0 +1,73 @@
+# Semantic context for nao LLM Talk To My Data agent
+# Scope: agent-only additions — routing keywords, example questions, query patterns.
+# Business context, column definitions, and when-to-use prose live in sources.yml and gold/schema.yml.
+# Do not introduce column descriptions or business context here — reference those files instead.
+
+project:
+  name: pea-pme-pulse
+  universe: 571 PEA-PME eligible French SMEs (Boursorama référentiel)
+  primary_key: isin
+  timezone: Europe/Paris
+
+tables:
+  - name: gold.score_news
+    keywords:
+      - top companies
+      - best score
+      - worst score
+      - investment score
+      - ranking
+      - news signal
+      - which company
+      - classement
+      - meilleures entreprises
+    example_questions:
+      - "What are the top 10 companies by investment score today?"
+      - "Which company has the strongest news signal this week?"
+      - "Show me companies with investment_score >= 8"
+      - "What is the investment score for Thermador Groupe?"
+      - "Which companies have the most media coverage in the last 45 days?"
+      - "Quelles sont les 5 meilleures entreprises selon le score d'investissement ?"
+
+  - name: gold.article_sentiment
+    keywords:
+      - articles
+      - news
+      - why did this company score
+      - sentiment reason
+      - recent articles
+      - what was written about
+      - actualités
+      - pourquoi ce score
+    example_questions:
+      - "Show me the 5 most recent articles about Showroomprivé"
+      - "Why did this company receive a high sentiment score?"
+      - "What articles drove the score for Obiz this month?"
+      - "List all articles scored below 3 in the last 7 days"
+      - "How many articles were scored today?"
+
+query_patterns:
+  top_n_companies: >
+    SELECT matched_name, ticker_bourso, investment_score, mention_count_45d
+    FROM gold.score_news
+    ORDER BY investment_score DESC
+    LIMIT <n>
+
+  company_score_lookup: >
+    SELECT matched_name, investment_score, avg_sentiment_45d, mention_count_45d, score_date
+    FROM gold.score_news
+    WHERE matched_name LIKE '%<company>%' OR ticker_bourso = '<ticker>'
+
+  recent_articles_for_company: >
+    SELECT title, published_at, sentiment_score, sentiment_reason
+    FROM gold.article_sentiment
+    WHERE isin = '<isin>'
+    ORDER BY published_at DESC
+    LIMIT <n>
+
+  articles_driving_score: >
+    SELECT title, published_at, sentiment_score, sentiment_reason
+    FROM gold.article_sentiment
+    WHERE isin = '<isin>'
+      AND published_at >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 45 DAY)
+    ORDER BY sentiment_score DESC
