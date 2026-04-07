@@ -13,6 +13,7 @@ Reason is one sentence grounded strictly in the article text.
 
 import json
 import os
+import re
 import time
 
 from groq import Groq, RateLimitError
@@ -37,6 +38,17 @@ Rules:
 - The reason must cite specific facts from the article, not generic statements."""
 
 
+def _extract_json(raw: str) -> dict:
+    """Parse Groq response robustly — handles markdown fences and minor formatting issues."""
+    # Strip markdown code fences if present
+    cleaned = re.sub(r"```(?:json)?\s*|\s*```", "", raw).strip()
+    # Extract first {...} block in case of trailing garbage
+    match = re.search(r"\{.*\}", cleaned, re.DOTALL)
+    if not match:
+        raise ValueError(f"no JSON object found in response: {raw!r}")
+    return json.loads(match.group())
+
+
 def score_article(title: str, summary: str, api_key: str | None = None) -> dict:
     """Score one article. Returns {"score": int, "reason": str}.
 
@@ -55,10 +67,9 @@ def score_article(title: str, summary: str, api_key: str | None = None) -> dict:
                 ],
                 temperature=0.1,
                 max_tokens=120,
-                response_format={"type": "json_object"},
             )
             raw = response.choices[0].message.content
-            result = json.loads(raw)
+            result = _extract_json(raw)
             score = int(result["score"])
             if not 0 <= score <= 10:
                 raise ValueError(f"score out of range: {score}")
