@@ -1,14 +1,68 @@
 version: 2
 
+# External tables dbt reads but does not build.
+# Column documentation lives here alongside the source declaration.
+# All column descriptions reference definitions.md via {{ doc('...') }} — do not define concepts inline.
+
 sources:
   - name: bronze
     database: bootcamp-project-pea-pme
     schema: bronze
     tables:
       - name: yahoo_rss
-        description: "Raw matched Yahoo Finance FR RSS articles — fetched every 4h"
+        description: >
+          Raw Yahoo Finance FR RSS articles matched to PEA-PME companies.
+          Grain: one row per matched article per flow run — may contain duplicates across runs (deduplication happens in Silver).
+          Only matched rows (isin not null) are loaded to BigQuery; unmatched are dropped after GCS dump.
+          Written by Prefect flow bronze-yahoo-rss every 4h. Raw dump preserved in GCS gs://project-pea-pme/rss_yahoo/.
+        columns:
+          - name: title
+            description: "{{ doc('title') }}"
+          - name: link
+            description: "{{ doc('link') }}"
+          - name: published
+            description: "{{ doc('published') }}"
+          - name: summary
+            description: "{{ doc('summary') }}"
+          - name: fetched_at
+            description: "{{ doc('fetched_at') }}"
+          - name: matched_name
+            description: "{{ doc('matched_name') }}"
+          - name: match_score
+            description: "{{ doc('match_score') }}"
+          - name: isin
+            description: "{{ doc('isin') }}"
+          - name: ticker_bourso
+            description: "{{ doc('ticker_bourso') }}"
+
       - name: google_news_rss
-        description: "Raw matched Google News RSS articles — fetched every 4h"
+        description: >
+          Raw Google News RSS articles matched to PEA-PME companies, from two feeds (euronext_growth, pme_bourse_fr).
+          Grain: one row per matched article per flow run — may contain duplicates across runs (deduplication happens in Silver).
+          Deduplicated by title within a single run before matching. Only matched rows (isin not null) are loaded to BigQuery.
+          Written by Prefect flow bronze-google-news-rss every 4h. Raw dump preserved in GCS gs://project-pea-pme/rss_google_news/.
+        columns:
+          - name: feed_name
+            description: "{{ doc('feed_name') }}"
+          - name: title
+            description: "{{ doc('title') }}"
+          - name: link
+            description: "{{ doc('link') }}"
+          - name: published
+            description: "{{ doc('published') }}"
+          - name: summary
+            description: "{{ doc('summary') }}"
+          - name: fetched_at
+            description: "{{ doc('fetched_at') }}"
+          - name: matched_name
+            description: "{{ doc('matched_name') }}"
+          - name: match_score
+            description: "{{ doc('match_score') }}"
+          - name: isin
+            description: "{{ doc('isin') }}"
+          - name: ticker_bourso
+            description: "{{ doc('ticker_bourso') }}"
+
       - name: amf
         description: "Raw AMF regulatory documents ingested from info-financiere.gouv.fr"
 
@@ -18,10 +72,10 @@ sources:
     tables:
       - name: article_sentiment
         description: >
-          One row per scored RSS article. Written by the Prefect silver-gold-rss flow via Groq.
-          Grain: one row per (row_id) — no duplicates enforced by LEFT JOIN on row_id before scoring.
-          Use this table to understand individual article signals or to audit scoring outputs.
-          For aggregated company scores, use gold.score_news instead.
+          One row per scored RSS article. Written by Prefect flow silver-gold-rss via Groq.
+          Grain: one row per row_id — no duplicates (enforced by LEFT JOIN on row_id before scoring).
+          Use this table for individual article signals, time series, or scoring audit.
+          For aggregated per-company scores, use gold.score_news instead.
         columns:
           - name: row_id
             description: "{{ doc('row_id') }}"
@@ -32,7 +86,7 @@ sources:
           - name: matched_name
             description: "{{ doc('matched_name') }}"
           - name: title
-            description: "Original article title from the RSS feed, as ingested in Silver. Not cleaned."
+            description: "{{ doc('title') }}"
           - name: published_at
             description: "{{ doc('published_at') }}"
           - name: sentiment_score

@@ -107,6 +107,23 @@ Silver and Gold logic lives in `dbt/models/` as SQL files. Bronze tables are dec
 | `rss_articles` | `silver` | `bronze.yahoo_rss`, `bronze.google_news_rss` | Unified RSS articles — deduplicated, timestamp parsed |
 | `score_news` | `gold` | `silver.rss_articles` | 45-day mention count per ISIN → normalized 1–10 (planned) |
 
+### Documentation convention
+
+Every table in the pipeline must be fully documented. Each piece of information has exactly one home — no duplication across files.
+
+| File | Owns |
+|---|---|
+| `dbt/models/definitions.md` | One definition per business concept (isin, sentiment_score, etc.) — all schema files reference these via `{{ doc('term') }}` · never define a concept inline |
+| `dbt/models/sources.yml` | All external source declarations (tables dbt reads but does not build: Bronze + `gold.article_sentiment`) · column docs via `{{ doc() }}` · table-level grain, pipeline ownership, when-to-use, when-NOT-to-use |
+| `dbt/models/silver/schema.yml` | Column docs for Silver dbt models only |
+| `dbt/models/gold/schema.yml` | Column docs for Gold dbt models only |
+| `dbt/semantic/nao_context.yml` | Agent-only additions: routing keywords, example questions, query patterns — nothing that belongs in schema files |
+
+Rules:
+- **100% column coverage** — every column in every table must have a description
+- **Single definition** — if a concept already exists in `definitions.md`, reference it; never introduce a second definition
+- **No cross-file duplication** — business context in `sources.yml`/`schema.yml`; routing hints in `nao_context.yml`; never both
+
 ### Local dev
 
 ```bash

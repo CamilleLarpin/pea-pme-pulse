@@ -49,3 +49,31 @@ Normalized ranking score 1–10 derived from avg_sentiment_45d via PERCENT_RANK 
 {% docs score_date %}
 Calendar date (Europe/Paris timezone) when this snapshot of score_news was computed. Since score_news is materialized as a table and rebuilt each run, score_date reflects the most recent pipeline execution.
 {% enddocs %}
+
+{% docs title %}
+Article title as returned by the RSS feed, before any cleaning or normalisation. Used as the input to fuzzy company matching and Groq sentiment scoring.
+{% enddocs %}
+
+{% docs link %}
+URL of the article as provided by the RSS feed. Points to the original publisher page.
+{% enddocs %}
+
+{% docs published %}
+Raw publish date string from the RSS feed, unparsed (e.g. "Mon, 07 Apr 2025 08:00:00 +0000"). Preserved as-is at Bronze layer. Parsed to TIMESTAMP in Silver as published_at.
+{% enddocs %}
+
+{% docs summary %}
+Article excerpt or description from the RSS feed. Used alongside title as input to Groq sentiment scoring.
+{% enddocs %}
+
+{% docs fetched_at %}
+UTC ISO-8601 timestamp when the Prefect flow fetched the RSS feed. One value per flow run — all articles in the same run share the same fetched_at.
+{% enddocs %}
+
+{% docs match_score %}
+Fuzzy match confidence score (0–100) produced by rapidfuzz when matching the article title against company names in the Boursorama référentiel. Null if no company was matched. Threshold: 80 — articles below threshold are kept with null isin.
+{% enddocs %}
+
+{% docs feed_name %}
+Identifier of the specific Google News RSS feed the article was fetched from. Values: euronext_growth | pme_bourse_fr. Not present in yahoo_rss (single feed source).
+{% enddocs %}

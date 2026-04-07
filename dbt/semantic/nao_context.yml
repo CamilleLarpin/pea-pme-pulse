@@ -1,24 +1,16 @@
 # Semantic context for nao LLM Talk To My Data agent
-# Purpose: tell the agent which tables exist, when to use each, and how to compute key metrics.
-# This file is the single source of truth for the agent's understanding of the Gold layer.
-# All definitions align with dbt/definitions.md — do not introduce new definitions here.
+# Scope: agent-only additions — routing keywords, example questions, query patterns.
+# Business context, column definitions, and when-to-use prose live in sources.yml and gold/schema.yml.
+# Do not introduce column descriptions or business context here — reference those files instead.
 
 project:
   name: pea-pme-pulse
-  description: >
-    Automated scoring pipeline for PEA-PME eligible French SMEs.
-    Produces a daily composite news investment score (1–10) per company
-    based on RSS article sentiment analyzed by Groq LLM.
-  universe: 571 PEA-PME eligible companies from the Boursorama référentiel
+  universe: 571 PEA-PME eligible French SMEs (Boursorama référentiel)
   primary_key: isin
   timezone: Europe/Paris
 
 tables:
   - name: gold.score_news
-    use_when: >
-      User asks about company rankings, top/bottom performers, investment scores,
-      news signal strength, which companies have the best or worst recent news,
-      or any question requiring a per-company aggregated view.
     keywords:
       - top companies
       - best score
@@ -29,33 +21,6 @@ tables:
       - which company
       - classement
       - meilleures entreprises
-    grain: one row per ISIN — current snapshot only, rebuilt each pipeline run
-    dimensions:
-      - name: isin
-        description: Unique company identifier. Primary key.
-      - name: ticker_bourso
-        description: Boursorama ticker. Use for display.
-      - name: matched_name
-        description: Company name. Use for display and filtering by company name.
-      - name: score_date
-        description: Date the snapshot was computed (Europe/Paris).
-    measures:
-      - name: investment_score
-        type: integer (1–10)
-        description: >
-          Relative news signal rank. 10 = strongest positive news in the universe today.
-          1 = weakest. Use for ranking and top-N queries.
-        aggregation: none — already a per-company score; do not re-average across companies
-      - name: avg_sentiment_45d
-        type: float (0–10)
-        description: >
-          Raw average sentiment over 45 days. Use when the user wants the underlying signal
-          before normalization, or to compare absolute sentiment levels.
-      - name: mention_count_45d
-        type: integer
-        description: >
-          Number of scored articles in the 45-day window. Use to assess data confidence:
-          a score based on 1 article is less reliable than one based on 20.
     example_questions:
       - "What are the top 10 companies by investment score today?"
       - "Which company has the strongest news signal this week?"
@@ -65,10 +30,6 @@ tables:
       - "Quelles sont les 5 meilleures entreprises selon le score d'investissement ?"
 
   - name: gold.article_sentiment
-    use_when: >
-      User asks about specific articles, individual news items, sentiment reasons,
-      time series of news for a company, or wants to understand why a company scored well or poorly.
-      Also use for audit queries: which articles were scored, when, by which model.
     keywords:
       - articles
       - news
@@ -78,58 +39,12 @@ tables:
       - what was written about
       - actualités
       - pourquoi ce score
-    grain: one row per scored article (row_id)
-    dimensions:
-      - name: isin
-        description: Company the article was matched to.
-      - name: matched_name
-        description: Company name.
-      - name: title
-        description: Article title as ingested from RSS.
-      - name: published_at
-        description: When the article was published (UTC). Use for time-range filters.
-      - name: scored_at
-        description: When the Prefect pipeline scored this article.
-      - name: groq_model
-        description: Groq model used. Current value — llama-3.3-70b-versatile.
-    measures:
-      - name: sentiment_score
-        type: integer (0–10)
-        description: >
-          Per-article investment signal. 0 = very negative, 10 = very positive.
-          To get a company-level view, average over a time window — or use gold.score_news directly.
-      - name: sentiment_reason
-        type: string
-        description: >
-          One-sentence Groq explanation for the score. Surface this when the user asks
-          "why" or wants to understand the news behind a score.
     example_questions:
       - "Show me the 5 most recent articles about Showroomprivé"
       - "Why did this company receive a high sentiment score?"
       - "What articles drove the score for Obiz this month?"
       - "List all articles scored below 3 in the last 7 days"
       - "How many articles were scored today?"
-
-metrics:
-  - name: investment_score
-    definition: >
-      PERCENT_RANK of avg_sentiment_45d across all companies in the current snapshot,
-      rescaled to integer 1–10 via ceil(pct_rank * 10), floored at 1.
-      Interpretation: relative rank within today's universe — not an absolute signal.
-    source_table: gold.score_news
-    column: investment_score
-
-  - name: avg_sentiment_45d
-    definition: >
-      AVG(sentiment_score) over all scored articles with published_at
-      >= CURRENT_TIMESTAMP - 45 days, grouped by isin.
-    source_table: gold.article_sentiment (aggregated) or gold.score_news (pre-computed)
-    column: avg_sentiment_45d
-
-  - name: mention_count_45d
-    definition: COUNT(*) of scored articles per company in the 45-day window.
-    source_table: gold.article_sentiment (aggregated) or gold.score_news (pre-computed)
-    column: mention_count_45d
 
 query_patterns:
   top_n_companies: >
