@@ -78,8 +78,6 @@ def compute_stocks_score(df: pd.DataFrame) -> pd.DataFrame:
     ).round(1)
 
     # --- 7-day rolling average (requires Date-sorted DataFrame per ISIN) ---
-    df["score_7d_avg"] = (
-        df["score_technique"].rolling(window=7, min_periods=1).mean().round(1)
-    )
+    df["score_7d_avg"] = df["score_technique"].rolling(window=7, min_periods=1).mean().round(1)
 
     return df

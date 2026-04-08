@@ -14,14 +14,14 @@ def _make_row(**kwargs) -> pd.DataFrame:
     """Crée un DataFrame d'une ligne avec des valeurs par défaut neutres."""
     defaults = {
         "Close": 100.0,
-        "RSI_14": 50.0,       # neutre
+        "RSI_14": 50.0,  # neutre
         "MACD": 0.0,
-        "MACD_signal": 0.0,   # égalité → baissier (0)
+        "MACD_signal": 0.0,  # égalité → baissier (0)
         "BB_upper": 110.0,
         "BB_lower": 90.0,
         "SMA_50": 100.0,
-        "SMA_200": 100.0,     # égalité → baissier (0)
-        "EMA_20": 100.0,      # égalité → baissier (0)
+        "SMA_200": 100.0,  # égalité → baissier (0)
+        "EMA_20": 100.0,  # égalité → baissier (0)
     }
     defaults.update(kwargs)
     return pd.DataFrame([defaults])
@@ -115,52 +115,68 @@ class TestTrendSignal:
 
 class TestCompositeScore:
     def test_perfect_bullish_score_is_10(self):
-        df = compute_stocks_score(_make_row(
-            RSI_14=25.0,        # +2
-            MACD=1.0, MACD_signal=0.0,  # +2
-            SMA_50=110.0, SMA_200=100.0,  # +2
-            Close=85.0, BB_lower=90.0, BB_upper=110.0,  # +2
-            EMA_20=80.0,        # +2
-        ))
+        df = compute_stocks_score(
+            _make_row(
+                RSI_14=25.0,  # +2
+                MACD=1.0,
+                MACD_signal=0.0,  # +2
+                SMA_50=110.0,
+                SMA_200=100.0,  # +2
+                Close=85.0,
+                BB_lower=90.0,
+                BB_upper=110.0,  # +2
+                EMA_20=80.0,  # +2
+            )
+        )
         assert df["score_technique"].iloc[0] == 10.0
 
     def test_perfect_bearish_score_is_0(self):
-        df = compute_stocks_score(_make_row(
-            RSI_14=75.0,        # +0
-            MACD=-1.0, MACD_signal=0.0,  # +0
-            SMA_50=90.0, SMA_200=100.0,  # +0
-            Close=115.0, BB_lower=90.0, BB_upper=110.0,  # +0
-            EMA_20=120.0,       # +0
-        ))
+        df = compute_stocks_score(
+            _make_row(
+                RSI_14=75.0,  # +0
+                MACD=-1.0,
+                MACD_signal=0.0,  # +0
+                SMA_50=90.0,
+                SMA_200=100.0,  # +0
+                Close=115.0,
+                BB_lower=90.0,
+                BB_upper=110.0,  # +0
+                EMA_20=120.0,  # +0
+            )
+        )
         assert df["score_technique"].iloc[0] == 0.0
 
     def test_all_nan_gives_5(self):
-        df = compute_stocks_score(_make_row(
-            RSI_14=float("nan"),
-            MACD=float("nan"),
-            MACD_signal=float("nan"),
-            SMA_50=float("nan"),
-            SMA_200=float("nan"),
-            BB_lower=float("nan"),
-            BB_upper=float("nan"),
-            EMA_20=float("nan"),
-        ))
+        df = compute_stocks_score(
+            _make_row(
+                RSI_14=float("nan"),
+                MACD=float("nan"),
+                MACD_signal=float("nan"),
+                SMA_50=float("nan"),
+                SMA_200=float("nan"),
+                BB_lower=float("nan"),
+                BB_upper=float("nan"),
+                EMA_20=float("nan"),
+            )
+        )
         assert df["score_technique"].iloc[0] == 5.0
 
     def test_score_bounds_random(self):
         rng = np.random.default_rng(42)
         n = 500
-        df_input = pd.DataFrame({
-            "Close": rng.uniform(50, 200, n),
-            "RSI_14": rng.uniform(0, 100, n),
-            "MACD": rng.uniform(-5, 5, n),
-            "MACD_signal": rng.uniform(-5, 5, n),
-            "BB_upper": rng.uniform(150, 200, n),
-            "BB_lower": rng.uniform(50, 100, n),
-            "SMA_50": rng.uniform(80, 150, n),
-            "SMA_200": rng.uniform(80, 150, n),
-            "EMA_20": rng.uniform(80, 150, n),
-        })
+        df_input = pd.DataFrame(
+            {
+                "Close": rng.uniform(50, 200, n),
+                "RSI_14": rng.uniform(0, 100, n),
+                "MACD": rng.uniform(-5, 5, n),
+                "MACD_signal": rng.uniform(-5, 5, n),
+                "BB_upper": rng.uniform(150, 200, n),
+                "BB_lower": rng.uniform(50, 100, n),
+                "SMA_50": rng.uniform(80, 150, n),
+                "SMA_200": rng.uniform(80, 150, n),
+                "EMA_20": rng.uniform(80, 150, n),
+            }
+        )
         result = compute_stocks_score(df_input)
         assert (result["score_technique"] >= 0).all()
         assert (result["score_technique"] <= 10).all()
@@ -168,21 +184,38 @@ class TestCompositeScore:
 
 class TestScore7dAvg:
     def test_7d_avg_single_row(self):
-        df = compute_stocks_score(_make_row(
-            RSI_14=25.0, MACD=1.0, MACD_signal=0.0,
-            SMA_50=110.0, SMA_200=100.0,
-            Close=85.0, BB_lower=90.0, BB_upper=110.0,
-            EMA_20=80.0,
-        ))
+        df = compute_stocks_score(
+            _make_row(
+                RSI_14=25.0,
+                MACD=1.0,
+                MACD_signal=0.0,
+                SMA_50=110.0,
+                SMA_200=100.0,
+                Close=85.0,
+                BB_lower=90.0,
+                BB_upper=110.0,
+                EMA_20=80.0,
+            )
+        )
         # Single row: score_7d_avg == score_technique
         assert df["score_7d_avg"].iloc[0] == df["score_technique"].iloc[0]
 
     def test_7d_avg_rolling(self):
         # 7 identical rows → avg == score
-        rows = [_make_row(RSI_14=25.0, MACD=1.0, MACD_signal=0.0,
-                          SMA_50=110.0, SMA_200=100.0,
-                          Close=85.0, BB_lower=90.0, BB_upper=110.0,
-                          EMA_20=80.0) for _ in range(7)]
+        rows = [
+            _make_row(
+                RSI_14=25.0,
+                MACD=1.0,
+                MACD_signal=0.0,
+                SMA_50=110.0,
+                SMA_200=100.0,
+                Close=85.0,
+                BB_lower=90.0,
+                BB_upper=110.0,
+                EMA_20=80.0,
+            )
+            for _ in range(7)
+        ]
         df = pd.concat(rows, ignore_index=True)
         result = compute_stocks_score(df)
         assert (result["score_7d_avg"] == 10.0).all()
