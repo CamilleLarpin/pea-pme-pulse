@@ -63,6 +63,56 @@ sources:
           - name: ticker_bourso
             description: "{{ doc('ticker_bourso') }}"
 
+      - name: abcbourse_news_rss
+        description: >
+          Raw ABCBourse news RSS articles matched to PEA-PME companies.
+          Grain: one row per matched article per flow run — deduplication happens in Silver.
+          Written by Prefect flow bronze-abcbourse-rss. Fields: title, link, summary (→ description), isin,
+          matched_name, match_score, ticker_bourso, published (ISO datetime string), ingested_at (→ fetched_at).
+        columns:
+          - name: title
+            description: "{{ doc('title') }}"
+          - name: link
+            description: "{{ doc('link') }}"
+          - name: published
+            description: "{{ doc('published') }}"
+          - name: description
+            description: "Article body text — aliased as summary in Silver"
+          - name: ingested_at
+            description: "Timestamp when the row was ingested — aliased as fetched_at in Silver"
+          - name: matched_name
+            description: "{{ doc('matched_name') }}"
+          - name: match_score
+            description: "{{ doc('match_score') }}"
+          - name: isin
+            description: "{{ doc('isin') }}"
+          - name: ticker_bourso
+            description: "{{ doc('ticker_bourso') }}"
+
+      - name: abcbourse_analysis_rss
+        description: >
+          Raw ABCBourse analyst report RSS articles matched to PEA-PME companies.
+          Same schema as abcbourse_news_rss.
+        columns:
+          - name: title
+            description: "{{ doc('title') }}"
+          - name: link
+            description: "{{ doc('link') }}"
+          - name: published
+            description: "{{ doc('published') }}"
+          - name: description
+            description: "Article body text — aliased as summary in Silver"
+          - name: ingested_at
+            description: "Timestamp when the row was ingested — aliased as fetched_at in Silver"
+          - name: matched_name
+            description: "{{ doc('matched_name') }}"
+          - name: match_score
+            description: "{{ doc('match_score') }}"
+          - name: isin
+            description: "{{ doc('isin') }}"
+          - name: ticker_bourso
+            description: "{{ doc('ticker_bourso') }}"
+
       - name: amf
         description: "Raw AMF regulatory documents ingested from info-financiere.gouv.fr"
 
