@@ -66,6 +66,10 @@ class TestMacdSignal:
         df = compute_stocks_score(_make_row(MACD=float("nan")))
         assert df["macd_signal"].iloc[0] == 1.0
 
+    def test_macd_equal_signal_gives_0(self):
+        df = compute_stocks_score(_make_row(MACD=1.0, MACD_signal=1.0))
+        assert df["macd_signal"].iloc[0] == 0.0
+
 
 class TestGoldenCross:
     def test_golden_cross_gives_2(self):
@@ -79,6 +83,10 @@ class TestGoldenCross:
     def test_sma_200_nan_gives_1(self):
         df = compute_stocks_score(_make_row(SMA_200=float("nan")))
         assert df["golden_cross_signal"].iloc[0] == 1.0
+
+    def test_sma_equal_gives_0(self):
+        df = compute_stocks_score(_make_row(SMA_50=100.0, SMA_200=100.0))
+        assert df["golden_cross_signal"].iloc[0] == 0.0
 
 
 class TestBollingerSignal:
@@ -111,6 +119,10 @@ class TestTrendSignal:
     def test_ema_nan_gives_1(self):
         df = compute_stocks_score(_make_row(EMA_20=float("nan")))
         assert df["trend_signal"].iloc[0] == 1.0
+
+    def test_close_equal_ema_gives_0(self):
+        df = compute_stocks_score(_make_row(Close=100.0, EMA_20=100.0))
+        assert df["trend_signal"].iloc[0] == 0.0
 
 
 class TestCompositeScore:

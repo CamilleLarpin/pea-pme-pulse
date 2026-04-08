@@ -181,6 +181,14 @@ sources:
             description: "{{ doc('EMA_20') }}"
           - name: computed_at
             description: "{{ doc('computed_at') }}"
+          - name: Open
+            description: "Prix d'ouverture de la séance (EUR)"
+          - name: High
+            description: "Plus haut de la séance (EUR)"
+          - name: Low
+            description: "Plus bas de la séance (EUR)"
+          - name: Volume
+            description: "Volume échangé sur la séance (nombre de titres)"
 
   - name: gold
     database: bootcamp-project-pea-pme
