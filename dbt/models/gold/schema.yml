@@ -1,6 +1,61 @@
 version: 2
 
 models:
+  - name: stocks_score
+    description: >
+      Daily technical score per PEA-PME company — one row per (ISIN, date), full history rebuilt on every pipeline run.
+      Grain: one row per (isin, date). is_latest=TRUE marks the most recent trading date per ISIN.
+      Methodology: 5 technical signals (RSI, MACD, Golden Cross, Bollinger Bands, EMA trend) × 0/1/2 pts → score_technique ∈ [0, 10].
+      NaN policy: indicator unavailable (warmup < required periods) → neutral score (+1), no penalty.
+      Use score_technique for point-in-time ranking, score_7d_avg for smoothed trend, is_latest to filter the current snapshot.
+    columns:
+      - name: isin
+        description: "{{ doc('isin') }}"
+        tests:
+          - not_null
+      - name: yf_ticker
+        description: "{{ doc('yf_ticker') }}"
+      - name: date
+        description: "{{ doc('date_cotation') }}"
+        tests:
+          - not_null
+      - name: Close
+        description: "{{ doc('close_price') }}"
+        tests:
+          - not_null
+      - name: rsi_signal
+        description: "{{ doc('rsi_signal') }}"
+        tests:
+          - not_null
+      - name: macd_signal
+        description: "{{ doc('macd_signal') }}"
+        tests:
+          - not_null
+      - name: golden_cross_signal
+        description: "{{ doc('golden_cross_signal') }}"
+        tests:
+          - not_null
+      - name: bollinger_signal
+        description: "{{ doc('bollinger_signal') }}"
+        tests:
+          - not_null
+      - name: trend_signal
+        description: "{{ doc('trend_signal') }}"
+        tests:
+          - not_null
+      - name: score_technique
+        description: "{{ doc('score_technique') }}"
+        tests:
+          - not_null
+      - name: score_7d_avg
+        description: "{{ doc('score_7d_avg') }}"
+        tests:
+          - not_null
+      - name: is_latest
+        description: "{{ doc('is_latest') }}"
+        tests:
+          - not_null
+
   - name: score_news
     description: >
       Daily investment news score per PEA-PME company — one row per ISIN, rebuilt on every pipeline run.

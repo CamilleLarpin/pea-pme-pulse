@@ -8,6 +8,10 @@ Step 2 — compute_silver:
     Reads silver.yahoo_ohlcv_clean, computes technical indicators
     (RSI_14, MACD, BB, SMA_50/200, EMA_20) and writes to silver.yahoo_ohlcv.
 
+Step 3 — dbt run stocks_score:
+    Reads silver.yahoo_ohlcv, computes 5 technical signals and score_technique [0-10],
+    and writes to gold.stocks_score.
+
 Designed to run after bronze-yfinance-ohlcv completes each weekday at 19h30 Paris.
 """
 
@@ -106,12 +110,69 @@ def yfinance_silver_compute() -> None:
     run()
 
 
+@task(name="dbt-run-stocks-score", retries=1, retry_delay_seconds=60)
+def dbt_run_stocks_score() -> None:
+    """
+    Matérialise gold.stocks_score via dbt.
+
+    Lit silver.yahoo_ohlcv, calcule 5 signaux techniques et score_technique [0-10],
+    et écrit le résultat dans gold.stocks_score (table complète, grain: isin × date).
+    """
+    logger = get_run_logger()
+    keyfile = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
+
+    cmd = [
+        "dbt",
+        "run",
+        "--select",
+        "stocks_score",
+        "--project-dir",
+        str(DBT_PROJECT_DIR),
+    ]
+
+    if keyfile:
+        profiles = f"""pea_pme_pulse:
+  target: prod
+  outputs:
+    prod:
+      type: bigquery
+      method: service-account
+      project: {GCP_PROJECT}
+      dataset: gold
+      threads: 4
+      timeout_seconds: 300
+      location: EU
+      keyfile: {keyfile}
+"""
+        with tempfile.TemporaryDirectory() as profiles_dir:
+            (Path(profiles_dir) / "profiles.yml").write_text(profiles)
+            result = subprocess.run(
+                cmd + ["--profiles-dir", profiles_dir],
+                capture_output=True,
+                text=True,
+            )
+            logger.info("dbt stdout:\n%s", result.stdout)
+            if result.returncode != 0:
+                logger.error("dbt stderr:\n%s", result.stderr)
+                raise RuntimeError(f"dbt run failed (exit {result.returncode})")
+    else:
+        logger.info("GOOGLE_APPLICATION_CREDENTIALS not set — using local dbt profile")
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        logger.info("dbt stdout:\n%s", result.stdout)
+        if result.returncode != 0:
+            logger.error("dbt stderr:\n%s", result.stderr)
+            raise RuntimeError(f"dbt run failed (exit {result.returncode})")
+
+    logger.info("dbt-run-stocks-score complete")
+
+
 @flow(name="silver-yfinance-ohlcv")
 def silver_yfinance_ohlcv_flow() -> None:
     logger = get_run_logger()
     logger.info("Démarrage flow silver-yfinance-ohlcv")
     dbt_run_yahoo_ohlcv_clean()
     yfinance_silver_compute()
+    dbt_run_stocks_score()
     logger.info("Flow silver-yfinance-ohlcv terminé")
 
 

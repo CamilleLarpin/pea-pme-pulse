@@ -129,3 +129,35 @@ Trading date (DATE, YYYY-MM-DD) for which the OHLCV prices were recorded. Market
 {% docs close_price %}
 Adjusted closing price for the session (EUR for Euronext Paris listings), as returned by Yahoo Finance. Used as the base for all Silver technical indicators (RSI, MACD, Bollinger Bands, SMA, EMA).
 {% enddocs %}
+
+{% docs score_technique %}
+Composite technical attractiveness score for a single trading day, in [0, 10]. Sum of 5 signals (rsi_signal + macd_signal + golden_cross_signal + bollinger_signal + trend_signal), each worth 0 (bearish), 1 (neutral/NaN), or 2 (bullish). Rounded to 1 decimal. A score of 10 means all 5 indicators are bullish; 5 means all are neutral; 0 means all are bearish.
+{% enddocs %}
+
+{% docs score_7d_avg %}
+7-day rolling average of score_technique, computed over (partition by isin order by date rows between 6 preceding and current row). Rounded to 1 decimal. Smooths day-to-day volatility in the technical score and provides a short-term trend signal. Useful in the Daily Ranking Report to distinguish sustained performers from single-day spikes.
+{% enddocs %}
+
+{% docs rsi_signal %}
+Technical signal derived from RSI_14. Scoring: RSI_14 < 30 (oversold) → 2.0 (bullish); 30 ≤ RSI_14 < 70 (neutral zone) → 1.0; RSI_14 ≥ 70 (overbought) → 0.0 (bearish); NULL (warmup period) → 1.0 (neutral, no penalty).
+{% enddocs %}
+
+{% docs macd_signal %}
+Technical signal derived from MACD vs MACD_signal line. Scoring: MACD > MACD_signal (bullish crossover) → 2.0; MACD ≤ MACD_signal → 0.0 (bearish); either value NULL (warmup < 34 bars) → 1.0 (neutral).
+{% enddocs %}
+
+{% docs golden_cross_signal %}
+Technical signal based on the SMA_50 / SMA_200 relationship. Scoring: SMA_50 > SMA_200 (golden cross — long-term bullish regime) → 2.0; SMA_50 ≤ SMA_200 (death cross or equal — bearish) → 0.0; either SMA NULL (warmup < 200 bars) → 1.0 (neutral).
+{% enddocs %}
+
+{% docs bollinger_signal %}
+Technical signal based on closing price position relative to Bollinger Bands. Scoring: Close < BB_lower (oversold / outside lower band) → 2.0 (mean-reversion buy signal); Close > BB_upper (overbought / outside upper band) → 0.0; Close within bands → 1.0 (neutral); either band NULL (warmup < 20 bars) → 1.0.
+{% enddocs %}
+
+{% docs trend_signal %}
+Technical signal based on closing price vs EMA_20. Scoring: Close > EMA_20 (price above short-term trend) → 2.0 (bullish); Close ≤ EMA_20 → 0.0 (bearish); EMA_20 NULL (warmup) → 1.0 (neutral).
+{% enddocs %}
+
+{% docs is_latest %}
+Boolean flag: TRUE if date equals the most recent trading date available for this ISIN (MAX(date) OVER (PARTITION BY isin)), FALSE otherwise. Use WHERE is_latest = TRUE to get the current snapshot of one row per ISIN — equivalent to a DISTINCT ON (isin) ORDER BY date DESC. Required for joining stocks_score into the composite pea_pme_pulse model.
+{% enddocs %}
