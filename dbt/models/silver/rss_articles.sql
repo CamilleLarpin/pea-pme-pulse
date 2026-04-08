@@ -50,10 +50,36 @@ google_news as (
     {% endif %}
 ),
 
+abcbourse as (
+    select
+        to_hex(md5(concat(lower(title), '|', isin))) as row_id,
+        title,
+        link,
+        description as summary,
+        matched_name,
+        cast(match_score as float64) as match_score,
+        isin,
+        ticker_bourso,
+        cast(ingested_at as string) as fetched_at,
+        'abcbourse_rss' as source,
+        published as published_at
+    from (
+        select * from {{ source('bronze', 'abcbourse_news_rss') }}
+        union all
+        select * from {{ source('bronze', 'abcbourse_analysis_rss') }}
+    )
+    where isin is not null
+    {% if is_incremental() %}
+    and cast(ingested_at as string) > (select max(fetched_at) from {{ this }})
+    {% endif %}
+),
+
 unioned as (
     select * from yahoo
     union all
     select * from google_news
+    union all
+    select * from abcbourse
 ),
 
 deduped as (
