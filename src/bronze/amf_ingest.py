@@ -41,20 +41,14 @@ class Config:
     location: str
     dataset_id: str
     table_id: str
-    staging_table_id: str
     csv_path: str
     gcs_prefix: str
     chunk_size: int
     request_timeout: int
-    write_disposition_staging: str
 
     @property
     def full_table_id(self) -> str:
         return f"{self.project_id}.{self.dataset_id}.{self.table_id}"
-
-    @property
-    def full_staging_table_id(self) -> str:
-        return f"{self.project_id}.{self.dataset_id}.{self.staging_table_id}"
 
 
 @dataclass(frozen=True)
@@ -86,12 +80,10 @@ def load_config() -> Config:
         location=os.environ.get("GCP_LOCATION", "EU"),
         dataset_id=os.environ.get("BQ_DATASET_ID", "bronze"),
         table_id=DATA_SOURCE,
-        staging_table_id=os.environ.get("BQ_STAGING_TABLE_ID", f"{DATA_SOURCE}_staging"),
         csv_path="referentiel/boursorama_peapme_final.csv",
         gcs_prefix=DATA_SOURCE,
         chunk_size=200,
         request_timeout=120,
-        write_disposition_staging="WRITE_TRUNCATE",
     )
 
 
@@ -107,6 +99,14 @@ BQ_SCHEMA: list[bigquery.SchemaField] = [
     bigquery.SchemaField("source", "STRING"),
     bigquery.SchemaField("run_id", "STRING"),
     bigquery.SchemaField("ingestion_ts", "TIMESTAMP"),
+    bigquery.SchemaField("pdf_download_status", "STRING"),
+    bigquery.SchemaField("pdf_gcs_uri", "STRING"),
+    bigquery.SchemaField("pdf_error_message", "STRING"),
+    bigquery.SchemaField("pdf_http_status", "INT64"),
+    bigquery.SchemaField("pdf_content_type", "STRING"),
+    bigquery.SchemaField("pdf_file_size_bytes", "INT64"),
+    bigquery.SchemaField("pdf_last_check_ts", "TIMESTAMP"),
+    bigquery.SchemaField("pdf_download_run_id", "STRING"),
 ]
 
 # ============================================================================
@@ -620,30 +620,83 @@ def inject_bq(
     config: Config,
     gcs_artifacts: GcsArtifacts,
 ) -> None:
-    bq_client = bigquery.Client(project=config.project_id)
+    client = bigquery.Client(project=config.project_id)
 
     ensure_dataset_exists(
-        client=bq_client,
+        client=client,
         project_id=config.project_id,
         dataset_id=config.dataset_id,
         location=config.location,
     )
-    ensure_table_exists(bq_client, config.full_table_id)
-    ensure_table_exists(bq_client, config.full_staging_table_id)
+    ensure_table_exists(client, config.full_table_id)
 
+    temp_table_id = f"{config.full_table_id}__temp_{utc_now().strftime('%Y%m%d%H%M%S')}"
+
+    logger.info("Using temp table: {}", temp_table_id)
+
+    # 1. load dans table temporaire
     gcs_to_bq(
-        client=bq_client,
+        client=client,
         gcs_uri=gcs_artifacts.clean_uri,
-        full_table_id=config.full_staging_table_id,
-        write_disposition=config.write_disposition_staging,
+        full_table_id=temp_table_id,
+        write_disposition="WRITE_TRUNCATE",
         schema=BQ_SCHEMA,
     )
 
-    merge_staging_into_target(
-        client=bq_client,
-        staging_table_id=config.full_staging_table_id,
-        target_table_id=config.full_table_id,
-    )
+    # 2. merge
+    query = f"""
+    MERGE `{config.full_table_id}` AS T
+    USING `{temp_table_id}` AS S
+    ON T.record_id = S.record_id
+
+    WHEN MATCHED THEN
+      UPDATE SET
+        T.societe = S.societe,
+        T.isin = S.isin,
+        T.publication_ts = S.publication_ts,
+        T.pdf_url = S.pdf_url,
+        T.titre = S.titre,
+        T.sous_type = S.sous_type,
+        T.type_information = S.type_information,
+        T.source = S.source,
+        T.run_id = S.run_id,
+        T.ingestion_ts = S.ingestion_ts
+
+    WHEN NOT MATCHED THEN
+      INSERT (
+        record_id,
+        societe,
+        isin,
+        publication_ts,
+        pdf_url,
+        titre,
+        sous_type,
+        type_information,
+        source,
+        run_id,
+        ingestion_ts
+      )
+      VALUES (
+        S.record_id,
+        S.societe,
+        S.isin,
+        S.publication_ts,
+        S.pdf_url,
+        S.titre,
+        S.sous_type,
+        S.type_information,
+        S.source,
+        S.run_id,
+        S.ingestion_ts
+      )
+    """
+
+    client.query(query).result()
+    logger.info("MERGE completed")
+
+    # 3. cleanup
+    client.delete_table(temp_table_id, not_found_ok=True)
+    logger.info("Temp table deleted: {}", temp_table_id)
 
 
 # ============================================================================

@@ -21,7 +21,18 @@ jobs:
           python-version: "3.11"
 
       - name: Install Poetry
-        run: pip install poetry
+        run: pipx install poetry==2.3.2
+
+      - name: Add pipx bin to PATH
+        run: echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Show versions
+        run: |
+          python --version
+          poetry --version
+
+      - name: Check lock file
+        run: poetry check --lock
 
       - name: Install dependencies
         run: poetry install --extras dev --no-root

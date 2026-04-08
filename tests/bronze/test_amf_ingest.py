@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import json
+from datetime import datetime
 from pathlib import Path
 from unittest.mock import Mock
 
@@ -22,12 +23,10 @@ def sample_config() -> mod.Config:
         location="EU",
         dataset_id="bronze",
         table_id="amf",
-        staging_table_id="amf_staging",
         csv_path="referentiel/boursorama_peapme_final.csv",
         gcs_prefix="amf",
         chunk_size=2,
         request_timeout=120,
-        write_disposition_staging="WRITE_TRUNCATE",
     )
 
 
@@ -423,32 +422,6 @@ def test_cleanup_run_context_removes_files_and_directory(tmp_path: Path) -> None
 
 
 # ============================================================================
-# merge_staging_into_target
-# ============================================================================
-
-
-def test_merge_staging_into_target_executes_query() -> None:
-    client = Mock()
-    job = Mock()
-    client.query.return_value = job
-
-    mod.merge_staging_into_target(
-        client=client,
-        staging_table_id="my-project.bronze.amf_staging",
-        target_table_id="my-project.bronze.amf",
-    )
-
-    client.query.assert_called_once()
-    query_arg = client.query.call_args.args[0]
-
-    assert "MERGE `my-project.bronze.amf` AS T" in query_arg
-    assert "USING `my-project.bronze.amf_staging` AS S" in query_arg
-    assert "ON T.record_id = S.record_id" in query_arg
-
-    job.result.assert_called_once()
-
-
-# ============================================================================
 # inject_bq
 # ============================================================================
 
@@ -464,7 +437,12 @@ def test_inject_bq_calls_expected_steps(
     ensure_dataset = mocker.patch.object(mod, "ensure_dataset_exists")
     ensure_table = mocker.patch.object(mod, "ensure_table_exists")
     gcs_to_bq = mocker.patch.object(mod, "gcs_to_bq")
-    merge = mocker.patch.object(mod, "merge_staging_into_target")
+
+    fake_now = datetime(2026, 4, 2, 10, 0, 0, tzinfo=mod.UTC)
+    mocker.patch.object(mod, "utc_now", return_value=fake_now)
+
+    query_job = Mock()
+    fake_client.query.return_value = query_job
 
     mod.inject_bq(
         config=sample_config,
@@ -480,20 +458,24 @@ def test_inject_bq_calls_expected_steps(
         location=sample_config.location,
     )
 
-    assert ensure_table.call_count == 2
-    ensure_table.assert_any_call(fake_client, sample_config.full_table_id)
-    ensure_table.assert_any_call(fake_client, sample_config.full_staging_table_id)
+    ensure_table.assert_called_once_with(fake_client, sample_config.full_table_id)
+
+    temp_table_id = "my-project.bronze.amf__temp_20260402100000"
 
     gcs_to_bq.assert_called_once_with(
         client=fake_client,
         gcs_uri=sample_gcs_artifacts.clean_uri,
-        full_table_id=sample_config.full_staging_table_id,
-        write_disposition=sample_config.write_disposition_staging,
+        full_table_id=temp_table_id,
+        write_disposition="WRITE_TRUNCATE",
         schema=mod.BQ_SCHEMA,
     )
 
-    merge.assert_called_once_with(
-        client=fake_client,
-        staging_table_id=sample_config.full_staging_table_id,
-        target_table_id=sample_config.full_table_id,
-    )
+    fake_client.query.assert_called_once()
+    query_arg = fake_client.query.call_args.args[0]
+    assert f"MERGE `{sample_config.full_table_id}` AS T" in query_arg
+    assert f"USING `{temp_table_id}` AS S" in query_arg
+    assert "WHEN MATCHED THEN" in query_arg
+    assert "WHEN NOT MATCHED THEN" in query_arg
+
+    query_job.result.assert_called_once()
+    fake_client.delete_table.assert_called_once_with(temp_table_id, not_found_ok=True)
