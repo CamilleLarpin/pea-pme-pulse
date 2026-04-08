@@ -44,9 +44,12 @@ def dbt_run_yahoo_ohlcv_clean() -> None:
     keyfile = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
 
     cmd = [
-        "dbt", "run",
-        "--select", "yahoo_ohlcv_clean",
-        "--project-dir", str(DBT_PROJECT_DIR),
+        "dbt",
+        "run",
+        "--select",
+        "yahoo_ohlcv_clean",
+        "--project-dir",
+        str(DBT_PROJECT_DIR),
     ]
 
     if keyfile:
