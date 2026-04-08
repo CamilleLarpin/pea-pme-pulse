@@ -88,12 +88,9 @@ deployments:
   - name: silver-yfinance-ohlcv
     version: "0.1.0"
     tags: ["silver", "ohlcv", "yfinance"]
-    description: "Silver yfinance OHLCV — technical indicators (run daily after bronze-yfinance-ohlcv)"
+    description: "Silver yfinance OHLCV — dbt clean + technical indicators. Triggered by bronze-yfinance-ohlcv on completion."
     entrypoint: src/flows/silver_yfinance_ohlcv.py:silver_yfinance_ohlcv_flow
     concurrency_limit: 1
-    schedule:
-      cron: "0 20 * * 1-5"
-      timezone: "Europe/Paris"
     work_pool:
       name: bronze-pool
       work_queue_name: default
