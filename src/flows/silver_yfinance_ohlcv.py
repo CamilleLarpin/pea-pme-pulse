@@ -122,9 +122,12 @@ def dbt_run_stocks_score() -> None:
     keyfile = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
 
     cmd = [
-        "dbt", "run",
-        "--select", "stocks_score",
-        "--project-dir", str(DBT_PROJECT_DIR),
+        "dbt",
+        "run",
+        "--select",
+        "stocks_score",
+        "--project-dir",
+        str(DBT_PROJECT_DIR),
     ]
 
     if keyfile:
