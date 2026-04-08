@@ -131,32 +131,31 @@ def dbt_run_gold() -> None:
     ]
 
     if keyfile:
-        profiles = f"""pea_pme_pulse:
+        method = "service-account"
+        extra = f"      keyfile: {keyfile}\n"
+    else:
+        method = "oauth"
+        extra = ""
+
+    profiles = f"""pea_pme_pulse:
   target: prod
   outputs:
     prod:
       type: bigquery
-      method: service-account
+      method: {method}
       project: {GCP_PROJECT}
       dataset: gold
       threads: 4
       timeout_seconds: 300
       location: EU
-      keyfile: {keyfile}
-"""
-        with tempfile.TemporaryDirectory() as profiles_dir:
-            (Path(profiles_dir) / "profiles.yml").write_text(profiles)
-            result = subprocess.run(
-                cmd + ["--profiles-dir", profiles_dir],
-                capture_output=True,
-                text=True,
-            )
-            logger.info("dbt stdout:\n%s", result.stdout)
-            if result.returncode != 0:
-                logger.error("dbt stderr:\n%s", result.stderr)
-                raise RuntimeError(f"dbt run failed (exit {result.returncode})")
-    else:
-        result = subprocess.run(cmd, capture_output=True, text=True)
+{extra}"""
+    with tempfile.TemporaryDirectory() as profiles_dir:
+        (Path(profiles_dir) / "profiles.yml").write_text(profiles)
+        result = subprocess.run(
+            cmd + ["--profiles-dir", profiles_dir],
+            capture_output=True,
+            text=True,
+        )
         logger.info("dbt stdout:\n%s", result.stdout)
         if result.returncode != 0:
             logger.error("dbt stderr:\n%s", result.stderr)
