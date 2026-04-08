@@ -151,6 +151,7 @@ def chunked(items: list[Any], size: int) -> list[list[Any]]:
 # ============================================================================
 
 FINANCIAL_KEYWORDS = [
+    # Revenue / sales
     "chiffre d'affaires",
     "chiffre d affaires",
     "ca ",
@@ -160,6 +161,7 @@ FINANCIAL_KEYWORDS = [
     "revenues",
     "sales",
     "net sales",
+    # Profitability
     "ebitda",
     "ebit",
     "résultat opérationnel",
@@ -172,6 +174,7 @@ FINANCIAL_KEYWORDS = [
     "marge opérationnelle",
     "marge operationnelle",
     "marge op",
+    # Debt / cash
     "dette nette",
     "endettement net",
     "trésorerie nette",
@@ -187,6 +190,7 @@ FINANCIAL_KEYWORDS = [
     "flux de tresorerie disponible",
     "flux de trésorerie",
     "flux de tresorerie",
+    # Growth / percentages
     "croissance",
     "growth",
     "increase",
@@ -194,6 +198,7 @@ FINANCIAL_KEYWORDS = [
     "year-on-year",
     "yoy",
     "%",
+    # Dates / reporting periods
     "clos le",
     "exercice clos",
     "premier semestre clos",
@@ -210,6 +215,7 @@ FINANCIAL_KEYWORDS = [
     "half-year",
     "first half",
     "second half",
+    # Units / currencies
     "m€",
     "md€",
     "k€",
@@ -237,6 +243,7 @@ def score_financial_block(block: str) -> int:
     score = 0
 
     keyword_weights = {
+        # Revenue
         "chiffre d'affaires": 3,
         "chiffre d affaires": 3,
         "revenu": 2,
@@ -244,6 +251,7 @@ def score_financial_block(block: str) -> int:
         "revenue": 2,
         "sales": 2,
         "net sales": 2,
+        # Profitability
         "ebitda": 4,
         "ebit": 2,
         "résultat opérationnel": 3,
@@ -254,6 +262,7 @@ def score_financial_block(block: str) -> int:
         "marge operationnelle": 4,
         "marge op": 3,
         "operating margin": 4,
+        # Debt / cash
         "dette nette": 4,
         "endettement net": 4,
         "net debt": 4,
@@ -266,6 +275,7 @@ def score_financial_block(block: str) -> int:
         "flux de tresorerie disponible": 4,
         "flux de trésorerie": 2,
         "flux de tresorerie": 2,
+        # Dates
         "clos le": 3,
         "exercice clos": 3,
         "premier semestre clos": 3,
@@ -279,6 +289,7 @@ def score_financial_block(block: str) -> int:
         "half-year": 2,
         "first half": 2,
         "second half": 2,
+        # Growth / percentages
         "croissance": 2,
         "growth": 2,
         "year-on-year": 2,
