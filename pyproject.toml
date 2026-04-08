@@ -23,6 +23,8 @@ dependencies = [
     "google-cloud-core (>=2.5.1,<3.0.0)",
     "dbt-bigquery",
     "groq",
+    "fastapi",
+    "uvicorn[standard]",
 ]
 
 [project.optional-dependencies]
