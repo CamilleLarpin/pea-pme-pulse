@@ -133,3 +133,90 @@ models:
         description: "Timestamp when the row was ingested"
         tests:
           - not_null
+
+  - name: amf_financial_signal
+    description: "Silver table containing deduplicated financial signals extracted from AMF PDFs."
+    columns:
+      - name: record_id
+        description: "Unique AMF document identifier."
+        tests:
+          - not_null
+          - unique
+
+      - name: isin
+        description: "ISIN of the issuer."
+
+      - name: ticker
+        description: "Ticker if available."
+
+      - name: source_url
+        description: "Original AMF PDF URL."
+
+      - name: pdf_gcs_uri
+        description: "GCS URI of the downloaded PDF."
+
+      - name: document_publication_ts
+        description: "Publication timestamp of the AMF document."
+
+      - name: date_cloture_exercice
+        description: "Reporting period end date extracted from the document."
+
+      - name: ca
+        description: "Revenue normalized in EUR."
+
+      - name: ca_growth
+        description: "Revenue growth percentage as numeric percentage value."
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: -1000
+              max_value: 10000
+              config:
+                severity: warn
+
+      - name: ebitda
+        description: "EBITDA normalized in EUR."
+
+      - name: marge_op
+        description: "Operating margin percentage as numeric percentage value."
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: -1000
+              max_value: 10000
+              config:
+                severity: warn
+
+      - name: dette_nette
+        description: "Net debt normalized in EUR."
+
+      - name: fcf
+        description: "Free cash flow normalized in EUR."
+
+      - name: parser_used
+        description: "Parser used for PDF text extraction."
+
+      - name: llm_model
+        description: "LLM model used for extraction."
+
+      - name: llm_prompt_version
+        description: "Prompt version used for extraction."
+
+      - name: source
+        description: "Source system identifier."
+
+      - name: source_run_id
+        description: "Bronze ingestion run id."
+
+      - name: financial_signal_run_id
+        description: "Silver extraction run id."
+        tests:
+          - not_null
+
+      - name: extracted_at
+        description: "Timestamp when extraction row was produced."
+        tests:
+          - not_null
+
+      - name: loaded_at
+        description: "Timestamp when the silver model was built."
+        tests:
+          - not_null
