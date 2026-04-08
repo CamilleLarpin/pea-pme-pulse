@@ -5,21 +5,11 @@ Triggered by bronze-silver-rss via run_deployment() after Silver dbt refresh.
 """
 
 import os
+import subprocess
 import sys
 import tempfile
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
-
-_gcp_creds_json = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS_JSON")
-if _gcp_creds_json and not os.environ.get("GOOGLE_APPLICATION_CREDENTIALS"):
-    _tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False)
-    _tmp.write(_gcp_creds_json)
-    _tmp.close()
-    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = _tmp.name
-
-import subprocess
 
 import pandas as pd
 from google.cloud import bigquery
@@ -27,6 +17,16 @@ from prefect import flow, get_run_logger, task
 from prefect.cache_policies import NO_CACHE
 
 from gold.sentiment_scorer import MODEL, score_article
+
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
+
+_gcp_creds_json = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS_JSON")
+if _gcp_creds_json and not os.environ.get("GOOGLE_APPLICATION_CREDENTIALS"):
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as _tmp:
+        _tmp.write(_gcp_creds_json)
+        _tmp.close()
+        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = _tmp.name
+
 
 GCP_PROJECT = "bootcamp-project-pea-pme"
 DBT_PROJECT_DIR = Path(__file__).parent.parent.parent / "dbt"
@@ -87,24 +87,26 @@ def score_and_write(df: pd.DataFrame, client: bigquery.Client) -> int:
         return 0
 
     api_key = os.environ.get("GROQ_API_KEY")
-    scored_at = datetime.now(timezone.utc)
+    scored_at = datetime.now(UTC)
     rows = []
 
     for _, row in df.iterrows():
         try:
             result = score_article(row["title"], row.get("summary"), api_key=api_key)
-            rows.append({
-                "row_id": row["row_id"],
-                "isin": row["isin"],
-                "ticker_bourso": row.get("ticker_bourso"),
-                "matched_name": row.get("matched_name"),
-                "title": row["title"],
-                "published_at": row.get("published_at"),
-                "sentiment_score": result["score"],
-                "sentiment_reason": result["reason"],
-                "groq_model": MODEL,
-                "scored_at": scored_at,
-            })
+            rows.append(
+                {
+                    "row_id": row["row_id"],
+                    "isin": row["isin"],
+                    "ticker_bourso": row.get("ticker_bourso"),
+                    "matched_name": row.get("matched_name"),
+                    "title": row["title"],
+                    "published_at": row.get("published_at"),
+                    "sentiment_score": result["score"],
+                    "sentiment_reason": result["reason"],
+                    "groq_model": MODEL,
+                    "scored_at": scored_at,
+                }
+            )
         except Exception as e:
             logger.warning("Skipping row_id=%s — %s", row["row_id"], e)
 
@@ -125,9 +127,12 @@ def dbt_run_gold() -> None:
     keyfile = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
 
     cmd = [
-        "dbt", "run",
-        "--select", "gold.score_news",
-        "--project-dir", str(DBT_PROJECT_DIR),
+        "dbt",
+        "run",
+        "--select",
+        "gold.score_news",
+        "--project-dir",
+        str(DBT_PROJECT_DIR),
     ]
 
     if keyfile:
