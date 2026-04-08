@@ -33,11 +33,16 @@ project-pea-pme
 │   ├── google_news_rss
 │   ├── amf
 │   ├── abcbourse_rss
-│   └── boursorama
+│   ├── boursorama
+│   └── yfinance_ohlcv      # daily OHLCV prices, 462 ISINs (yfinance)
 ├── silver
-│   └── rss_articles        # unified RSS feed (all sources, deduplicated)
+│   ├── rss_articles        # unified RSS feed (all sources, deduplicated)
+│   ├── yahoo_ohlcv_clean   # dbt: dedup + validation of bronze.yfinance_ohlcv
+│   └── yahoo_ohlcv         # Python: OHLCV + RSI_14, MACD, BB, SMA_50/200, EMA_20
 └── gold
-    └── score_news          # 45-day mention count per ISIN → normalized 1–10 (planned)
+    ├── article_sentiment   # Groq LLM sentiment scores per article
+    ├── score_news          # 45-day mention count per ISIN → normalized 1–10
+    └── stocks_score        # 5 technical signals → score_technique [0–10] per (isin, date)
 ```
 
 ---
@@ -71,12 +76,20 @@ Flows live under `src/flows/` · deployment config in `prefect.yaml`.
 
 ### Flows
 
-| Flow | File | Schedule |
+| Flow | File | Schedule / Trigger |
 |---|---|---|
 | `bronze-yahoo-rss` | `src/flows/bronze_yahoo_rss.py` | cron `0 */4 * * *` Europe/Paris |
 | `bronze-google-news-rss` | `src/flows/bronze_google_news_rss.py` | cron `0 */4 * * *` Europe/Paris |
+| `bronze-yfinance-ohlcv` | `src/flows/bronze_yfinance_ohlcv.py` | cron `0 19 * * 1-5` Europe/Paris |
+| `silver-yfinance-ohlcv` | `src/flows/silver_yfinance_ohlcv.py` | triggered by `bronze-yfinance-ohlcv` on completion |
+| `silver-gold-rss` | `src/flows/gold_sentiment.py` | triggered by `bronze-silver-rss` on completion |
 
-Workspace: `camille-larpin/pea-pme` on Prefect Cloud · work pool: `bronze-pool` (Docker) · target: GCP e2-small
+**Silver yfinance pipeline order (within `silver-yfinance-ohlcv`):**
+1. `dbt run yahoo_ohlcv_clean` — dedup + validate Bronze → `silver.yahoo_ohlcv_clean`
+2. `compute_silver` (Python) — technical indicators → `silver.yahoo_ohlcv`
+3. `dbt run stocks_score` — scoring → `gold.stocks_score`
+
+Workspace: self-hosted Prefect server on GCP VM (`PREFECT_API_URL=http://35.241.252.5/api`)
 
 Deploy:
 ```bash
@@ -105,7 +118,9 @@ Silver and Gold logic lives in `dbt/models/` as SQL files. Bronze tables are dec
 | Model | Dataset | Sources | Description |
 |---|---|---|---|
 | `rss_articles` | `silver` | `bronze.yahoo_rss`, `bronze.google_news_rss` | Unified RSS articles — deduplicated, timestamp parsed |
-| `score_news` | `gold` | `silver.rss_articles` | 45-day mention count per ISIN → normalized 1–10 (planned) |
+| `yahoo_ohlcv_clean` | `silver` | `bronze.yfinance_ohlcv` | Dedup + validation of daily OHLCV prices — adds `last_trading_date` |
+| `score_news` | `gold` | `silver.rss_articles` | 45-day mention count per ISIN → normalized 1–10 |
+| `stocks_score` | `gold` | `silver.yahoo_ohlcv` | 5 technical signals (RSI, MACD, Golden Cross, BB, EMA) → score_technique [0–10] per (isin, date), + score_7d_avg, is_latest |
 
 ### Documentation convention
 
