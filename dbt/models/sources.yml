@@ -113,6 +113,36 @@ sources:
           - name: ticker_bourso
             description: "{{ doc('ticker_bourso') }}"
 
+      - name: boursorama
+        description: >
+          PEA-PME company referentiel scraped from Boursorama — 571 companies.
+          External table backed by gs://project-pea-pme/boursorama_peapme_final.csv.
+          Grain: one row per company (current snapshot). Refreshed monthly by Prefect flow bronze-boursorama.
+          Also used as the local referentiel CSV for fuzzy matching in all Bronze flows.
+        columns:
+          - name: name
+            description: "{{ doc('matched_name') }}"
+          - name: ticker_bourso
+            description: "{{ doc('ticker_bourso') }}"
+          - name: isin
+            description: "{{ doc('isin') }}"
+          - name: detail_url
+            description: "Boursorama company detail page URL"
+          - name: last
+            description: "Last traded price at time of scrape"
+          - name: variation
+            description: "Daily price variation (%) at time of scrape"
+          - name: high
+            description: "Day high price at time of scrape"
+          - name: low
+            description: "Day low price at time of scrape"
+          - name: volume
+            description: "Traded volume at time of scrape (often null)"
+          - name: raw_data_ist_init
+            description: "Raw JSON market data blob from Boursorama data-ist-init attribute"
+          - name: ingested_at
+            description: "{{ doc('fetched_at') }}"
+
       - name: amf
         description: "Raw AMF regulatory documents ingested from info-financiere.gouv.fr"
 

@@ -56,6 +56,39 @@ models:
         tests:
           - not_null
 
+  - name: company_scores
+    description: >
+      Enriched PEA-PME company list — one row per ISIN, rebuilt on every monthly pipeline run.
+      Grain: one row per ISIN. Left join: all 571 companies appear; score columns null when no articles exist yet.
+      Combines the latest silver.companies snapshot (name, ticker) with the current gold.score_news signal.
+      Use for company ranking, nao Talk To My Data, or composite scoring.
+    columns:
+      - name: isin
+        description: "{{ doc('isin') }}"
+        tests:
+          - not_null
+          - unique
+      - name: name
+        description: "{{ doc('matched_name') }}"
+        tests:
+          - not_null
+      - name: ticker_bourso
+        description: "{{ doc('ticker_bourso') }}"
+        tests:
+          - not_null
+      - name: snapshot_date
+        description: "Date of the latest silver.companies snapshot used"
+        tests:
+          - not_null
+      - name: investment_score
+        description: "{{ doc('investment_score') }}"
+      - name: mention_count_45d
+        description: "{{ doc('mention_count_45d') }}"
+      - name: avg_sentiment_45d
+        description: "{{ doc('avg_sentiment_45d') }}"
+      - name: score_date
+        description: "{{ doc('score_date') }}"
+
   - name: score_news
     description: >
       Daily investment news score per PEA-PME company — one row per ISIN, rebuilt on every pipeline run.
