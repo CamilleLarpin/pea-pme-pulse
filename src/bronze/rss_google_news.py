@@ -78,7 +78,7 @@ def write_to_bigquery(df: pd.DataFrame) -> None:
     table_id = f"{BQ_PROJECT}.{BQ_DATASET}.{BQ_TABLE}"
     if "match_score" in df.columns:
         df = df.copy()
-        df["match_score"] = df["match_score"].astype(str)
+        df["match_score"] = df["match_score"].astype(float)
     job = client.load_table_from_dataframe(df, table_id)
     job.result()
     logger.info("BQ load: {} rows → {}", len(df), table_id)
