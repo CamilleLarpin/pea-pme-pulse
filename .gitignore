@@ -26,3 +26,4 @@ data/
 dbt/target/
 dbt/dbt_packages/
 dbt/logs/
+nao_config.yaml
