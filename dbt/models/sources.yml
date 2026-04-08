@@ -89,6 +89,49 @@ sources:
           - name: ingested_at
             description: "{{ doc('fetched_at') }}"
 
+  - name: silver
+    database: bootcamp-project-pea-pme
+    schema: silver
+    tables:
+      - name: yahoo_ohlcv
+        description: >
+          OHLCV data + technical indicators for all PEA-PME ISINs.
+          Written by compute_silver.py from silver.yahoo_ohlcv_clean.
+          Grain: one row per (isin, Date). Not a dbt model — managed externally by Python pipeline.
+        columns:
+          - name: isin
+            description: "{{ doc('isin') }}"
+            tests:
+              - not_null
+          - name: Date
+            description: "{{ doc('date_cotation') }}"
+            tests:
+              - not_null
+          - name: Close
+            description: "{{ doc('close_price') }}"
+            tests:
+              - not_null
+          - name: yf_ticker
+            description: "{{ doc('yf_ticker') }}"
+          - name: RSI_14
+            description: "{{ doc('RSI_14') }}"
+          - name: MACD
+            description: "{{ doc('MACD') }}"
+          - name: MACD_signal
+            description: "{{ doc('MACD_signal') }}"
+          - name: BB_upper
+            description: "{{ doc('BB_upper') }}"
+          - name: BB_lower
+            description: "{{ doc('BB_lower') }}"
+          - name: SMA_50
+            description: "{{ doc('SMA_50') }}"
+          - name: SMA_200
+            description: "{{ doc('SMA_200') }}"
+          - name: EMA_20
+            description: "{{ doc('EMA_20') }}"
+          - name: computed_at
+            description: "{{ doc('computed_at') }}"
+
   - name: gold
     database: bootcamp-project-pea-pme
     schema: gold

@@ -1,7 +1,7 @@
 # src/silver/compute_silver.py
 #
 # Pipeline Silver — Indicateurs techniques OHLCV PEA-PME
-# Source      : BigQuery → bronze.yfinance_ohlcv
+# Source      : BigQuery → silver.yahoo_ohlcv_clean (dbt model — clean Bronze data)
 # Destination : BigQuery → silver.yahoo_ohlcv
 #
 # Indicateurs calculés via `ta` :
@@ -40,7 +40,7 @@ from ta.volatility import BollingerBands
 
 GCP_PROJECT_ID = "bootcamp-project-pea-pme"
 
-BQ_BRONZE_TABLE = f"{GCP_PROJECT_ID}.bronze.yfinance_ohlcv"
+BQ_BRONZE_TABLE = f"{GCP_PROJECT_ID}.silver.yahoo_ohlcv_clean"
 BQ_SILVER_TABLE = f"{GCP_PROJECT_ID}.silver.yahoo_ohlcv"
 
 # Schéma explicite Silver — contrairement au Bronze (autodetect),
@@ -87,7 +87,7 @@ def load_bronze_isins(client: bigquery.Client) -> list[str]:
     Récupère la liste des ISIN distincts présents dans le Bronze.
 
     Point de départ du pipeline Silver : on ne traite que les ISIN
-    effectivement disponibles en Bronze (459 sur 561 au lancement).
+    effectivement disponibles dans silver.yahoo_ohlcv_clean (table dbt propre).
     """
     query = f"SELECT DISTINCT isin FROM `{BQ_BRONZE_TABLE}` ORDER BY isin"
     result = client.query(query).result()
