@@ -14,6 +14,7 @@ from bronze.amf_ingest import (
     inject_bq,
     load_config,
 )
+from bronze.amf_pdf_ingest import run_pdf_ingestion
 
 
 @task(name="amf-load-config", retries=0)
@@ -37,6 +38,11 @@ def inject_bq_task(
     )
 
 
+@task(name="amf-pdf-ingest", retries=2, retry_delay_seconds=60)
+def amf_pdf_ingest_task() -> None:
+    run_pdf_ingestion()
+
+
 @flow(name="bronze-amf-flux", log_prints=True)
 def amf_flux_flow() -> None:
     logger = get_run_logger()
@@ -50,10 +56,12 @@ def amf_flux_flow() -> None:
         gcs_artifacts=gcs_artifacts,
     )
 
+    amf_pdf_ingest_task()
+
     logger.info(
         (
-            "AMF flow complete | run_id=%s | raw_count=%d | clean_count=%d "
-            "| raw_uri=%s | clean_uri=%s"
+            "AMF bronze flow complete | run_id=%s | raw_count=%d | clean_count=%d "
+            "| raw_uri=%s | clean_uri=%s | pdf_ingestion=done"
         ),
         gcs_artifacts.extraction.run_context.run_id,
         gcs_artifacts.extraction.raw_count,

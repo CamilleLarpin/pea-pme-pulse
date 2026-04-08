@@ -17,12 +17,10 @@ def make_sample_config() -> ingest_mod.Config:
         location="EU",
         dataset_id="bronze",
         table_id="amf",
-        staging_table_id="amf_staging",
         csv_path="referentiel/boursorama_peapme_final.csv",
         gcs_prefix="amf",
         chunk_size=200,
         request_timeout=120,
-        write_disposition_staging="WRITE_TRUNCATE",
     )
 
 
@@ -96,6 +94,15 @@ def test_inject_bq_task_calls_underlying_function(mocker) -> None:
     assert result is None
 
 
+def test_amf_pdf_ingest_task_calls_underlying_function(mocker) -> None:
+    run_pdf_ingestion_mock = mocker.patch.object(flow_mod, "run_pdf_ingestion")
+
+    result = flow_mod.amf_pdf_ingest_task.fn()
+
+    run_pdf_ingestion_mock.assert_called_once_with()
+    assert result is None
+
+
 # ============================================================================
 # Flow
 # ============================================================================
@@ -118,6 +125,7 @@ def test_amf_flux_flow_calls_tasks_in_order_and_logs(mocker) -> None:
         return_value=sample_gcs_artifacts,
     )
     inject_bq_task_mock = mocker.patch.object(flow_mod, "inject_bq_task")
+    amf_pdf_ingest_task_mock = mocker.patch.object(flow_mod, "amf_pdf_ingest_task")
 
     flow_mod.amf_flux_flow.fn()
 
@@ -128,11 +136,12 @@ def test_amf_flux_flow_calls_tasks_in_order_and_logs(mocker) -> None:
         config=sample_config,
         gcs_artifacts=sample_gcs_artifacts,
     )
+    amf_pdf_ingest_task_mock.assert_called_once_with()
 
     logger.info.assert_called_once()
     log_args = logger.info.call_args.args
 
-    assert "AMF flow complete" in log_args[0]
+    assert "AMF bronze flow complete" in log_args[0]
     assert sample_gcs_artifacts.extraction.run_context.run_id == log_args[1]
     assert sample_gcs_artifacts.extraction.raw_count == log_args[2]
     assert sample_gcs_artifacts.extraction.clean_count == log_args[3]
