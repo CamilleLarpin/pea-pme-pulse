@@ -1,6 +1,41 @@
 version: 2
 
 models:
+  - name: yahoo_ohlcv_clean
+    description: >
+      Clean daily OHLCV data for all PEA-PME ISINs — deduplicated, validated, enriched with last_trading_date.
+      Grain: one row per (isin, Date). Built incrementally from bronze.yfinance_ohlcv.
+      Used as input for compute_silver.py (technical indicators).
+    columns:
+      - name: isin
+        description: "{{ doc('isin') }}"
+        tests:
+          - not_null
+      - name: Date
+        description: "{{ doc('date_cotation') }}"
+        tests:
+          - not_null
+      - name: Close
+        description: "{{ doc('close_price') }}"
+        tests:
+          - not_null
+      - name: Open
+        description: "Prix d'ouverture de la séance (EUR)"
+        tests:
+          - not_null
+      - name: High
+        description: "Plus haut de la séance (EUR)"
+      - name: Low
+        description: "Plus bas de la séance (EUR)"
+      - name: Volume
+        description: "Volume échangé sur la séance"
+      - name: yf_ticker
+        description: "{{ doc('yf_ticker') }}"
+      - name: last_trading_date
+        description: "{{ doc('last_trading_date') }}"
+        tests:
+          - not_null
+
   - name: rss_articles
     description: >
       Unified silver RSS articles from all sources (Yahoo Finance FR, Google News).
@@ -9,7 +44,7 @@ models:
       - name: row_id
         description: "Surrogate key: hex(md5(lower(title) || '|' || isin)) — stable dedup key"
         tests:
-          - not_null          
+          - not_null
           - unique
       - name: isin
         description: "ISIN of the matched PEA-PME company"

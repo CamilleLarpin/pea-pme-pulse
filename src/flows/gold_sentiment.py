@@ -11,22 +11,20 @@ import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 
-import pandas as pd
-from google.cloud import bigquery
-from prefect import flow, get_run_logger, task
-from prefect.cache_policies import NO_CACHE
-
-from gold.sentiment_scorer import MODEL, score_article
-
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 _gcp_creds_json = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS_JSON")
 if _gcp_creds_json and not os.environ.get("GOOGLE_APPLICATION_CREDENTIALS"):
     with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as _tmp:
         _tmp.write(_gcp_creds_json)
-        _tmp.close()
-        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = _tmp.name
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = _tmp.name
 
+import pandas as pd  # noqa: E402
+from google.cloud import bigquery  # noqa: E402
+from prefect import flow, get_run_logger, task  # noqa: E402
+from prefect.cache_policies import NO_CACHE  # noqa: E402
+
+from gold.sentiment_scorer import MODEL, score_article  # noqa: E402
 
 GCP_PROJECT = "bootcamp-project-pea-pme"
 DBT_PROJECT_DIR = Path(__file__).parent.parent.parent / "dbt"

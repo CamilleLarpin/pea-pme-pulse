@@ -77,3 +77,55 @@ Fuzzy match confidence score (0–100) produced by rapidfuzz when matching the a
 {% docs feed_name %}
 Identifier of the specific Google News RSS feed the article was fetched from. Values: euronext_growth | pme_bourse_fr. Not present in yahoo_rss (single feed source).
 {% enddocs %}
+
+{% docs last_trading_date %}
+Most recent trading date available for this ISIN in the Silver table — computed as MAX(Date) OVER (PARTITION BY isin). Identical for all rows of the same ISIN. Use this to filter for the latest closing price without a subquery: WHERE Date = last_trading_date. Also useful to detect stale ISINs (last_trading_date far behind CURRENT_DATE).
+{% enddocs %}
+
+{% docs RSI_14 %}
+Relative Strength Index over 14 trading days. Momentum oscillator in [0, 100]. Values below 30 indicate oversold conditions (potential buy signal); values above 70 indicate overbought conditions (potential sell signal). NaN for the first 14 rows of each ISIN (insufficient warmup). Computed via ta.momentum.RSIIndicator(close, window=14).
+{% enddocs %}
+
+{% docs MACD %}
+Moving Average Convergence Divergence — difference between the 12-day EMA and 26-day EMA of the closing price. Positive values indicate short-term bullish momentum; negative values indicate bearish momentum. NaN for the first 26 rows. Computed via ta.trend.MACD(close).
+{% enddocs %}
+
+{% docs MACD_signal %}
+9-day EMA of the MACD line. A MACD crossover above the signal line is a classic buy signal; below is a sell signal. NaN for the first 34 rows (26-day EMA warmup + 9-day signal EMA).
+{% enddocs %}
+
+{% docs BB_upper %}
+Upper Bollinger Band: 20-day SMA + 2 standard deviations of closing price. A closing price near or above BB_upper suggests potential short-term overvaluation or strong upward momentum. NaN for the first 20 rows. Computed via ta.volatility.BollingerBands(close, window=20, window_dev=2).
+{% enddocs %}
+
+{% docs BB_lower %}
+Lower Bollinger Band: 20-day SMA − 2 standard deviations of closing price. A closing price near or below BB_lower suggests potential undervaluation or strong selling pressure. NaN for the first 20 rows.
+{% enddocs %}
+
+{% docs SMA_50 %}
+50-day Simple Moving Average of closing price. Medium-term trend indicator. A price above SMA_50 is generally interpreted as bullish in the medium term. NaN for the first 50 rows. Computed via ta.trend.SMAIndicator(close, window=50).
+{% enddocs %}
+
+{% docs SMA_200 %}
+200-day Simple Moving Average of closing price. Long-term trend benchmark — widely used by analysts. A price above SMA_200 signals a long-term bull market. A golden cross (SMA_50 crossing above SMA_200) is a strong bullish signal. NaN for the first 200 rows — longest warmup in the pipeline. Computed via ta.trend.SMAIndicator(close, window=200).
+{% enddocs %}
+
+{% docs EMA_20 %}
+20-day Exponential Moving Average of closing price. More reactive than SMA as it weights recent prices more heavily. Useful for detecting trend changes earlier than SMA. NaN for the first rows (EMA warmup). Computed via ta.trend.EMAIndicator(close, window=20).
+{% enddocs %}
+
+{% docs computed_at %}
+UTC timestamp (DATETIME) when the technical indicators were computed by compute_silver.py. Used to audit pipeline freshness and trace Prefect run history. One value per ISIN per pipeline run — all rows of the same run share the same computed_at.
+{% enddocs %}
+
+{% docs yf_ticker %}
+Yahoo Finance ticker symbol used to fetch OHLCV data (e.g. GFT.PA). Built from the Boursorama ticker by appending the exchange suffix (.PA for Euronext Paris). Primary key for yfinance API calls.
+{% enddocs %}
+
+{% docs date_cotation %}
+Trading date (DATE, YYYY-MM-DD) for which the OHLCV prices were recorded. Market days only — no entries for weekends or public holidays. Join key for time-series alignment with other sources.
+{% enddocs %}
+
+{% docs close_price %}
+Adjusted closing price for the session (EUR for Euronext Paris listings), as returned by Yahoo Finance. Used as the base for all Silver technical indicators (RSI, MACD, Bollinger Bands, SMA, EMA).
+{% enddocs %}

@@ -85,6 +85,19 @@ deployments:
       name: bronze-pool
       work_queue_name: default
 
+  - name: silver-yfinance-ohlcv
+    version: "0.1.0"
+    tags: ["silver", "ohlcv", "yfinance"]
+    description: "Silver yfinance OHLCV — dbt clean + technical indicators. Triggered by bronze-yfinance-ohlcv on completion."
+    entrypoint: src/flows/silver_yfinance_ohlcv.py:silver_yfinance_ohlcv_flow
+    concurrency_limit: 1
+    work_pool:
+      name: bronze-pool
+      work_queue_name: default
+      job_variables:
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: "{{ prefect.blocks.secret.gcp-sa-key }}"
+
   - name: bronze-abcbourse-rss
     version: "0.1.0"
     tags: ["bronze", "rss", "abcbourse"]
