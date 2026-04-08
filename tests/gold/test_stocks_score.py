@@ -6,7 +6,6 @@ DataFrames mockés avec des valeurs contrôlées pour chaque signal.
 
 import numpy as np
 import pandas as pd
-import pytest
 
 from gold.stocks_scorer import compute_stocks_score
 
