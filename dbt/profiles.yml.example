@@ -14,5 +14,5 @@ pea_pme_pulse:
       project: bootcamp-project-pea-pme
       dataset: silver        # default dataset — model +schema overrides apply per layer
       threads: 4
-      timeout_seconds: 300
+      timeout_seconds: 1800
       location: EU           # match your BQ dataset region
