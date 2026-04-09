@@ -1,6 +1,12 @@
 {{ config(materialized='table') }}
 
-with scored as (
+with companies as (
+    select isin, name
+    from {{ ref('companies') }}
+    qualify row_number() over (partition by isin order by snapshot_date desc) = 1
+),
+
+scored as (
     select
         isin,
         yf_ticker,
@@ -44,32 +50,44 @@ with scored as (
 )
 
 select
-    isin,
-    yf_ticker,
-    Date                                                                    as date,
-    Close,
+    s.isin,
+    coalesce(c.name, s.yf_ticker)                                           as company_name,
+    s.yf_ticker,
+    s.Date                                                                  as date,
+    s.Close,
 
-    rsi_signal,
-    macd_signal,
-    golden_cross_signal,
-    bollinger_signal,
-    trend_signal,
+    s.rsi_signal,
+    s.macd_signal,
+    s.golden_cross_signal,
+    s.bollinger_signal,
+    s.trend_signal,
 
     round(
-        rsi_signal + macd_signal + golden_cross_signal
-        + bollinger_signal + trend_signal,
+        s.rsi_signal + s.macd_signal + s.golden_cross_signal
+        + s.bollinger_signal + s.trend_signal,
     1)                                                                      as score_technique,
 
     round(
-        avg(rsi_signal + macd_signal + golden_cross_signal
-            + bollinger_signal + trend_signal)
+        avg(s.rsi_signal + s.macd_signal + s.golden_cross_signal
+            + s.bollinger_signal + s.trend_signal)
         over (
-            partition by isin
-            order by Date
+            partition by s.isin
+            order by s.Date
             rows between 6 preceding and current row
         ),
     1)                                                                      as score_7d_avg,
 
-    Date = max(Date) over (partition by isin)                               as is_latest
+    round(
+        avg(s.rsi_signal + s.macd_signal + s.golden_cross_signal
+            + s.bollinger_signal + s.trend_signal)
+        over (
+            partition by s.isin
+            order by s.Date
+            rows between 13 preceding and current row
+        ),
+    1)                                                                      as score_14d_avg,
 
-from scored
+    s.Date = max(s.Date) over (partition by s.isin)                         as is_latest
+
+from scored s
+left join companies c on s.isin = c.isin

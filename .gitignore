@@ -32,3 +32,6 @@ databases/
 logs/
 pea-pme-pulse/
 nao_config.yaml
+
+# Streamlit
+.streamlit/secrets.toml
