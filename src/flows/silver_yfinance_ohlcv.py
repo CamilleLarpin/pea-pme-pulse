@@ -29,6 +29,21 @@ DBT_PROJECT_DIR = Path(__file__).parent.parent.parent / "dbt"
 GCP_PROJECT = "bootcamp-project-pea-pme"
 
 
+@task(name="dbt-deps")
+def dbt_deps() -> None:
+    """Install dbt packages (dbt_packages/ is not persisted in the cloned repo)."""
+    logger = get_run_logger()
+    result = subprocess.run(
+        ["dbt", "deps", "--project-dir", str(DBT_PROJECT_DIR)],
+        capture_output=True,
+        text=True,
+    )
+    logger.info("dbt deps stdout:\n%s", result.stdout)
+    if result.returncode != 0:
+        logger.error("dbt deps stderr:\n%s", result.stderr)
+        raise RuntimeError(f"dbt deps failed (exit {result.returncode})")
+
+
 @task(name="dbt-run-yahoo-ohlcv-clean", retries=1, retry_delay_seconds=60)
 def dbt_run_yahoo_ohlcv_clean() -> None:
     """
@@ -147,6 +162,7 @@ def dbt_run_stocks_score() -> None:
 def silver_yfinance_ohlcv_flow() -> None:
     logger = get_run_logger()
     logger.info("Démarrage flow silver-yfinance-ohlcv")
+    dbt_deps()
     dbt_run_yahoo_ohlcv_clean()
     yfinance_silver_compute()
     dbt_run_stocks_score()
