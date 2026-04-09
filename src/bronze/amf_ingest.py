@@ -412,12 +412,13 @@ def ensure_bucket_exists(
     location: str,
 ) -> storage.Bucket:
     try:
+        bucket = client.get_bucket(bucket_name)
+        logger.info("Bucket already exists: {}", bucket_name)
+        return bucket
+    except NotFound:
         bucket = client.create_bucket(bucket_name, location=location)
         logger.info("Bucket created: {}", bucket_name)
         return bucket
-    except Conflict:
-        logger.info("Bucket already exists: {}", bucket_name)
-        return client.bucket(bucket_name)
 
 
 def upload_to_gcs(
