@@ -84,6 +84,9 @@ deployments:
     work_pool:
       name: bronze-pool
       work_queue_name: default
+      job_variables:
+        env:
+          GCP_PROJECT_ID: "bootcamp-project-pea-pme"
 
   - name: silver-yfinance-ohlcv
     version: "0.1.0"
