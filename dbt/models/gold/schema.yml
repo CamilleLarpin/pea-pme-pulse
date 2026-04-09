@@ -66,16 +66,16 @@ models:
 
   - name: company_scores
     description: >
-      Enriched PEA-PME company list — one row per ISIN, rebuilt on every monthly pipeline run.
-      Grain: one row per ISIN. Left join: all 571 companies appear; score columns null when no articles exist yet.
-      Combines the latest silver.companies snapshot (name, ticker) with the current gold.score_news signal.
-      Use for company ranking, nao Talk To My Data, or composite scoring.
+      Composite daily score per PEA-PME company — historised at (isin, score_date) grain.
+      All 571 companies appear on each run. Missing score dimensions fall back to mid-point (5.0).
+      Composite: weighted average of 4 normalised scores (0–10 each), 25% weight each.
+      score_news and score_insider normalised from [1–10] → [0–10]. score_stock and score_financials already [0–10].
+      score_financials sourced directly from BQ gold layer (fallback) until PR #51 is merged as a dbt model.
     columns:
       - name: isin
         description: "{{ doc('isin') }}"
         tests:
           - not_null
-          - unique
       - name: name
         description: "{{ doc('matched_name') }}"
         tests:
@@ -88,28 +88,34 @@ models:
         description: "Date of the latest silver.companies snapshot used"
         tests:
           - not_null
-      - name: investment_score
-        description: "{{ doc('investment_score') }}"
-      - name: mention_count_45d
-        description: "{{ doc('mention_count_45d') }}"
-      - name: avg_sentiment_45d
-        description: "{{ doc('avg_sentiment_45d') }}"
+      - name: score_news
+        description: "Normalised news sentiment score (0–10). Derived from score_news.investment_score [1–10] via (x-1)/9×10. Null → 5.0."
+      - name: score_stock
+        description: "Technical analysis score (0–10) from stocks_score.score_technique — latest trading day. Null → 5.0."
+      - name: score_insider
+        description: "Normalised insider conviction score (0–10). Derived from score_insider.score_1_10 [1–10] via (x-1)/9×10. Most recent signal within 45 days. Null → 5.0."
+      - name: score_financials
+        description: "Fundamental financial score (0–10) from financials_score.score_fondamental — most recent reporting period. Null → 5.0."
+      - name: composite_score
+        description: "Weighted composite score (0–10) — equal 25% weight per dimension. Mid-point fallback applied per missing dimension."
+        tests:
+          - not_null
       - name: score_date
         description: "{{ doc('score_date') }}"
+        tests:
+          - not_null
 
   - name: score_news
     description: >
-      Daily investment news score per PEA-PME company — one row per ISIN, rebuilt on every pipeline run.
-      Grain: one row per ISIN (current snapshot, not historical).
+      Daily investment news score per PEA-PME company — historised at (isin, score_date) grain.
+      One snapshot per pipeline run per company. Incremental: prior snapshots are preserved.
       Methodology: 45-day rolling average of article sentiment_score, normalized via PERCENT_RANK to a 1–10 scale.
-      Use this table to rank companies by news signal strength, identify top movers, or feed a composite scoring model.
-      Do not use for historical trend analysis — this table holds the current snapshot only; use gold.article_sentiment for time series.
+      Use this table to rank companies by news signal strength, track score evolution, or feed a composite scoring model.
     columns:
       - name: isin
         description: "{{ doc('isin') }}"
         tests:
           - not_null
-          - unique
       - name: ticker_bourso
         description: "{{ doc('ticker_bourso') }}"
       - name: matched_name

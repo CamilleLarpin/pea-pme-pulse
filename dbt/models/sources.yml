@@ -272,6 +272,12 @@ sources:
     database: bootcamp-project-pea-pme
     schema: gold
     tables:
+      - name: financials_score
+        description: >
+          Fundamental financial score per PEA-PME company — one row per (ticker, date_cloture_exercice).
+          Read directly from BQ gold layer as fallback until dbt model (PR #51) is merged into this repo.
+          Score: score_fondamental ∈ [0, 10] via weighted Z-score on ca_growth, marge_op, levier, fcf_yield.
+
       - name: article_sentiment
         description: >
           One row per scored RSS article. Written by Prefect flow silver-gold-rss via Groq.
