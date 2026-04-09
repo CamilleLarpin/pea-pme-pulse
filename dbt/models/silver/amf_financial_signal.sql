@@ -5,6 +5,8 @@
     on_schema_change='sync_all_columns'
 ) }}
 
+{% set active_prompt_version = var('amf_active_prompt_version', none) %}
+
 with source_rows as (
 
     select
@@ -28,9 +30,19 @@ with source_rows as (
         source_run_id,
         financial_signal_run_id,
         extracted_at,
-        extraction_status
+        extraction_status,
+
+        coalesce(
+            safe_cast(regexp_extract(llm_prompt_version, r'v(\d+)') as int64),
+            0
+        ) as llm_prompt_version_num
+
     from {{ source('work', 'amf_financial_signal_staging') }}
     where extraction_status = 'success'
+
+    {% if active_prompt_version is not none %}
+      and llm_prompt_version = '{{ active_prompt_version }}'
+    {% endif %}
 
     {% if is_incremental() %}
       and extracted_at >= (
@@ -47,7 +59,10 @@ deduplicated as (
     from source_rows
     qualify row_number() over (
         partition by record_id
-        order by extracted_at desc, financial_signal_run_id desc
+        order by
+            llm_prompt_version_num desc,
+            extracted_at desc,
+            financial_signal_run_id desc
     ) = 1
 
 ),
@@ -78,6 +93,7 @@ normalized as (
         parser_used,
         llm_model,
         llm_prompt_version,
+        llm_prompt_version_num,
         source,
         source_run_id,
         financial_signal_run_id,
@@ -163,6 +179,7 @@ final as (
         parser_used,
         llm_model,
         llm_prompt_version,
+        llm_prompt_version_num,
         source,
         source_run_id,
         financial_signal_run_id,
