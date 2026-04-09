@@ -64,7 +64,11 @@ def render_sidebar() -> None:
 **Score de 0 à 10** basé sur 5 indicateurs boursiers.
 Plus le score est élevé, plus les signaux techniques sont positifs.
 
-🟢 **7 – 10** : Signaux majoritairement haussiers<br>🟡 **4 – 7** : Signaux mixtes<br>🔴 **0 – 4** : Signaux majoritairement baissiers
+🟢 **7 – 10** : Signaux majoritairement haussiers
+
+🟡 **4 – 7** : Signaux mixtes
+
+🔴 **0 – 4** : Signaux majoritairement baissiers
 
 ---
 **Les 5 indicateurs :**
@@ -120,10 +124,7 @@ def render_kpis(df: pd.DataFrame) -> None:
 
 def render_ranking(df: pd.DataFrame) -> None:
     st.subheader("Classement du jour")
-    st.caption(
-        "Score de 0 à 10 basé sur 5 indicateurs techniques · "
-        "Le percentile indique la position relative dans l'univers des ~460 PME."
-    )
+    st.caption("Score de 0 à 10 basé sur 5 indicateurs techniques.")
 
     top10 = df.head(10).copy().reset_index(drop=True)
     top10["#"] = top10.index + 1
@@ -315,7 +316,7 @@ def main() -> None:
     render_sidebar()
 
     st.title("📈 PEA-PME Pulse — Tableau de bord")
-    st.caption("Scoring technique quotidien · Données BigQuery · Mise à jour toutes les heures")
+    st.caption("Scoring technique quotidien · Données BigQuery · Mise à jour chaque soir en semaine")
 
     with st.spinner("Chargement des données..."):
         df = load_latest_scores()

@@ -1,8 +1,9 @@
 import os
+import re
 from datetime import date
 from functools import lru_cache
 
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, HTTPException, Query
 from google.cloud import bigquery
 from pydantic import BaseModel
 
@@ -97,6 +98,10 @@ def get_score_history(
     days: int = Query(default=30, ge=1, le=365, description="Nombre de jours d'historique"),  # noqa: B008
 ):
     """Historique du score technique pour une liste d'ISINs."""
+    isin_re = re.compile(r"^[A-Z]{2}[A-Z0-9]{10}$")
+    invalid = [i for i in isins if not isin_re.match(i)]
+    if invalid:
+        raise HTTPException(status_code=422, detail=f"ISINs invalides : {invalid}")
     client = get_bq_client()
     isin_list = ", ".join(f"'{i}'" for i in isins)
     query = f"""
