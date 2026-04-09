@@ -87,6 +87,7 @@ deployments:
       job_variables:
         env:
           GCP_PROJECT_ID: "bootcamp-project-pea-pme"
+          GCS_BUCKET_NAME: "project-pea-pme"
 
   - name: silver-yfinance-ohlcv
     version: "0.1.0"
