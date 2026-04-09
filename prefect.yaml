@@ -14,7 +14,7 @@ pull:
       repository: https://github.com/CamilleLarpin/pea-pme-pulse.git
       branch: main
   - prefect.deployments.steps.run_shell_script:
-      script: pip install -e ".[dev]"
+      script: pip install ".[dev]"
       directory: "{{ git_clone.directory }}"
 
 deployments:
