@@ -26,6 +26,8 @@ dependencies = [
     "fastapi",
     "uvicorn[standard]",
     "pdfplumber",
+    "streamlit (>=1.56.0,<2.0.0)",
+    "plotly (>=6.6.0,<7.0.0)",
 ]
 
 [project.optional-dependencies]

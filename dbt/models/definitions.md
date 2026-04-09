@@ -161,6 +161,12 @@ Replaces the simpler inside/outside binary: ~95% of prices naturally fall within
 Technical signal based on closing price vs EMA_20. Scoring: Close > EMA_20 (price above short-term trend) → 2.0 (bullish); Close ≤ EMA_20 → 0.0 (bearish); EMA_20 NULL (warmup) → 1.0 (neutral).
 {% enddocs %}
 
+{% docs company_name %}
+Legal name of the PEA-PME company, sourced from the Boursorama referential (silver.companies, latest snapshot).
+Falls back to yf_ticker when the ISIN has no match in the referential.
+Use this column for display — do not use isin or yf_ticker as labels in reports or dashboards.
+{% enddocs %}
+
 {% docs is_latest %}
 Boolean flag: TRUE if date equals the most recent trading date available for this ISIN (MAX(date) OVER (PARTITION BY isin)), FALSE otherwise. Use WHERE is_latest = TRUE to get the current snapshot of one row per ISIN — equivalent to a DISTINCT ON (isin) ORDER BY date DESC. Required for joining stocks_score into the composite pea_pme_pulse model.
 {% enddocs %}

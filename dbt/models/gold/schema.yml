@@ -13,6 +13,10 @@ models:
         description: "{{ doc('isin') }}"
         tests:
           - not_null
+      - name: company_name
+        description: "{{ doc('company_name') }}"
+        tests:
+          - not_null
       - name: yf_ticker
         description: "{{ doc('yf_ticker') }}"
       - name: date
