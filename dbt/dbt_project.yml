@@ -20,9 +20,13 @@ vars:
 
 models:
   pea_pme_pulse:
+    +persist_docs:
+      relation: true
+      columns: true
     silver:
       +materialized: table
       +schema: silver
+      +job_execution_timeout_seconds: 1800
     gold:
       +materialized: table
       +schema: gold
