@@ -35,7 +35,7 @@ def get_api_base_url() -> str:
 
 @st.cache_data(ttl=3600)
 def load_latest_scores() -> pd.DataFrame:
-    resp = requests.get(f"{get_api_base_url()}/gold/stocks-score/latest", timeout=30)
+    resp = requests.get(f"{get_api_base_url()}/gold/stocks-score/latest", timeout=120)
     resp.raise_for_status()
     df = pd.DataFrame(resp.json())
     df = df.rename(columns={"close": "Close"})
@@ -47,7 +47,7 @@ def load_score_history(isins: tuple[str, ...], days: int) -> pd.DataFrame:
     resp = requests.get(
         f"{get_api_base_url()}/gold/stocks-score/history",
         params={"isins": list(isins), "days": days},
-        timeout=30,
+        timeout=120,
     )
     resp.raise_for_status()
     return pd.DataFrame(resp.json())
@@ -64,9 +64,7 @@ def render_sidebar() -> None:
 **Score de 0 à 10** basé sur 5 indicateurs boursiers.
 Plus le score est élevé, plus les signaux techniques sont positifs.
 
-🟢 **7 – 10** : Signaux majoritairement haussiers
-🟡 **4 – 7** : Signaux mixtes
-🔴 **0 – 4** : Signaux majoritairement baissiers
+🟢 **7 – 10** : Signaux majoritairement haussiers<br>🟡 **4 – 7** : Signaux mixtes<br>🔴 **0 – 4** : Signaux majoritairement baissiers
 
 ---
 **Les 5 indicateurs :**
@@ -194,10 +192,10 @@ def render_distribution(df: pd.DataFrame) -> None:
         annotation_position="top left",
     )
     fig.update_layout(height=300, bargap=0.05)
-    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": "hover", "displaylogo": False})
     st.info(
         "La distribution symétrique autour de 5 est attendue : RSI et Bollinger sont neutres "
-        "par défaut dans un marché normal. Le percentile dans le tableau discrimine mieux les ex-æquo."
+        "par défaut dans un marché normal."
     )
 
 
@@ -232,7 +230,7 @@ Un score élevé correspond à beaucoup de 🟢 sur la même ligne.
             colorbar_ticktext=["Baissier (0)", "Neutre (1)", "Haussier (2)"],
         )
         fig.update_layout(height=280)
-        st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+        st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": "hover", "displaylogo": False})
 
     with tab_top:
         _heatmap(df.head(10).copy())
@@ -257,7 +255,27 @@ def render_history(top_isins: tuple[str, ...]) -> None:
         st.info("Pas de données historiques disponibles.")
         return
 
-    st.caption("Score brut du jour. La ligne pointillée marque le seuil haussier (7).")
+    # ── Graphique 1 : moyenne glissante 7 jours ───────────────────────────────
+    st.caption("Moyenne glissante 7 jours — lisse les variations quotidiennes.")
+    fig_avg = px.line(
+        hist,
+        x="date",
+        y="score_7d_avg",
+        color="company_name",
+        labels={"score_7d_avg": "Moy. 7j (/10)", "company_name": "Entreprise", "date": "Date"},
+    )
+    fig_avg.add_hline(
+        y=7,
+        line_dash="dot",
+        line_color="grey",
+        annotation_text="Seuil haussier (7)",
+        annotation_position="bottom right",
+    )
+    fig_avg.update_layout(height=300, yaxis={"range": [0, 10]})
+    st.plotly_chart(fig_avg, use_container_width=True, config={"displayModeBar": "hover", "displaylogo": False})
+
+    # ── Graphique 2 : score brut ───────────────────────────────────────────────
+    st.caption("Score brut du jour · La ligne pointillée marque le seuil haussier (7).")
     fig = px.line(
         hist,
         x="date",
@@ -272,8 +290,8 @@ def render_history(top_isins: tuple[str, ...]) -> None:
         annotation_text="Seuil haussier (7)",
         annotation_position="bottom right",
     )
-    fig.update_layout(height=380, yaxis={"range": [0, 10]})
-    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+    fig.update_layout(height=300, yaxis={"range": [0, 10]})
+    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": "hover", "displaylogo": False})
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────

@@ -60,7 +60,7 @@ def dbt_run_yahoo_ohlcv_clean() -> None:
       project: {GCP_PROJECT}
       dataset: silver
       threads: 4
-      timeout_seconds: 300
+      timeout_seconds: 900
       location: EU
 {extra}"""
     with tempfile.TemporaryDirectory() as profiles_dir:
@@ -125,7 +125,7 @@ def dbt_run_stocks_score() -> None:
       project: {GCP_PROJECT}
       dataset: gold
       threads: 4
-      timeout_seconds: 300
+      timeout_seconds: 900
       location: EU
 {extra}"""
     with tempfile.TemporaryDirectory() as profiles_dir:

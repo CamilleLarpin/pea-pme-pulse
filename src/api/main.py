@@ -61,6 +61,7 @@ class ScoreHistory(BaseModel):
     company_name: str
     date: date
     score_technique: float
+    score_7d_avg: float | None
 
 
 # ── Stock score endpoints ─────────────────────────────────────────────────────
@@ -99,7 +100,7 @@ def get_score_history(
     client = get_bq_client()
     isin_list = ", ".join(f"'{i}'" for i in isins)
     query = f"""
-        SELECT isin, company_name, date, score_technique
+        SELECT isin, company_name, date, score_technique, score_7d_avg
         FROM `{GCP_PROJECT}.{GOLD_DATASET}.stocks_score`
         WHERE isin IN ({isin_list})
           AND date >= DATE_SUB(CURRENT_DATE(), INTERVAL {days} DAY)
