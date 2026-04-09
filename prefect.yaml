@@ -110,6 +110,12 @@ deployments:
     work_pool:
       name: bronze-pool
       work_queue_name: default
+      job_variables:
+        env:
+          GCS_SOURCE_REFERENTIEL: "referentiel/boursorama_peapme_final.csv"
+          GCP_PROJECT_ID: "bootcamp-project-pea-pme"
+          GCS_BUCKET_NAME: "project-pea-pme"
+          BQ_DATASET_BRONZE: "bronze"
 
   - name: bronze-silver-gold-boursorama
     version: "0.1.0"
