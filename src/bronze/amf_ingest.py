@@ -12,7 +12,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import requests
-from google.api_core.exceptions import Conflict
 from google.cloud import bigquery, storage
 from google.cloud.exceptions import NotFound
 from loguru import logger

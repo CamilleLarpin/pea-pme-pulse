@@ -477,9 +477,13 @@ def fetch_bronze_documents(
     recent_days = int(config.recent_days)
     minimum_relevance_score = int(config.minimum_relevance_score)
     if recent_days <= 0 or minimum_relevance_score < 0:
-        raise ValueError(f"Invalid config: recent_days={recent_days}, minimum_relevance_score={minimum_relevance_score}")
+        raise ValueError(
+            f"Invalid config: recent_days={recent_days}, minimum_relevance_score={minimum_relevance_score}"
+        )
 
-    limit_clause = f"\nLIMIT {int(config.max_documents)}" if config.max_documents is not None else ""
+    limit_clause = (
+        f"\nLIMIT {int(config.max_documents)}" if config.max_documents is not None else ""
+    )
 
     query = f"""
     WITH latest_run AS (
@@ -637,24 +641,30 @@ def fetch_bronze_documents(
     documents = []
     for row in rows:
         try:
-            pub_ts = isoformat_utc(row["document_publication_ts"]) if row["document_publication_ts"] is not None else None
+            pub_ts = (
+                isoformat_utc(row["document_publication_ts"])
+                if row["document_publication_ts"] is not None
+                else None
+            )
         except Exception:
             logger.warning("Could not parse publication_ts for record_id={}", row["record_id"])
             pub_ts = None
 
-        documents.append(BronzeDocument(
-            record_id=row["record_id"],
-            isin=row["isin"],
-            ticker=row["ticker"],
-            pdf_gcs_uri=row["pdf_gcs_uri"],
-            source_url=row["source_url"],
-            document_publication_ts=pub_ts,
-            titre=row["titre"],
-            sous_type=row["sous_type"],
-            type_information=row["type_information"],
-            source=row["source"],
-            source_run_id=row["source_run_id"],
-        ))
+        documents.append(
+            BronzeDocument(
+                record_id=row["record_id"],
+                isin=row["isin"],
+                ticker=row["ticker"],
+                pdf_gcs_uri=row["pdf_gcs_uri"],
+                source_url=row["source_url"],
+                document_publication_ts=pub_ts,
+                titre=row["titre"],
+                sous_type=row["sous_type"],
+                type_information=row["type_information"],
+                source=row["source"],
+                source_run_id=row["source_run_id"],
+            )
+        )
 
     logger.info(
         "Fetched {} bronze document(s) from latest run, last {} days, relevance_score>={}",
@@ -862,9 +872,7 @@ def call_groq_llama(
                 else None
             )
             reset_requests = (
-                response.headers.get("x-ratelimit-reset-requests")
-                if response is not None
-                else None
+                response.headers.get("x-ratelimit-reset-requests") if response is not None else None
             )
 
             if status_code == 429:
@@ -1006,7 +1014,6 @@ def process_document(
             document_text=document_text,
             max_chars=config.financial_context_max_chars,
         )
-        
 
         logger.info(
             "Financial context prepared | record_id={} | text_length={} | context_length={}",
@@ -1062,7 +1069,7 @@ def process_document(
                 financial_signal_run_id=financial_signal_run_id,
                 extracted_at=extracted_at,
             )
-                
+
         return FinancialSignalRow(
             record_id=document.record_id,
             isin=document.isin,
