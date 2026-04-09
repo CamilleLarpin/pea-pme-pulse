@@ -26,3 +26,9 @@ data/
 dbt/target/
 dbt/dbt_packages/
 dbt/logs/
+
+# nao runtime artifacts
+databases/
+logs/
+pea-pme-pulse/
+nao_config.yaml

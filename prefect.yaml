@@ -14,7 +14,7 @@ pull:
       repository: https://github.com/CamilleLarpin/pea-pme-pulse.git
       branch: main
   - prefect.deployments.steps.run_shell_script:
-      script: pip install -e ".[dev]"
+      script: pip install ".[dev]"
       directory: "{{ git_clone.directory }}"
 
 deployments:
@@ -105,6 +105,18 @@ deployments:
     entrypoint: src/flows/bronze_abcbourse_rss.py:abcbourse_rss_flow
     schedule:
       cron: "0 8 * * 1-5"
+      timezone: "Europe/Paris"
+    work_pool:
+      name: bronze-pool
+      work_queue_name: default
+
+  - name: bronze-silver-gold-boursorama
+    version: "0.1.0"
+    tags: ["bronze", "silver", "gold", "boursorama", "orchestrator"]
+    description: "Boursorama PEA-PME pipeline — scrape listing → GCS → dbt Silver companies → dbt Gold companies. Monthly on 1st at 08:00 Paris."
+    entrypoint: src/flows/bronze_silver_gold_boursorama.py:bronze_silver_gold_boursorama_flow
+    schedule:
+      cron: "0 8 1 * *"
       timezone: "Europe/Paris"
     work_pool:
       name: bronze-pool

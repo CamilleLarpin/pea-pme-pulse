@@ -113,6 +113,36 @@ sources:
           - name: ticker_bourso
             description: "{{ doc('ticker_bourso') }}"
 
+      - name: boursorama
+        description: >
+          PEA-PME company referentiel scraped from Boursorama — 571 companies.
+          External table backed by gs://project-pea-pme/boursorama_peapme_final.csv.
+          Grain: one row per company (current snapshot). Refreshed monthly by Prefect flow bronze-boursorama.
+          Also used as the local referentiel CSV for fuzzy matching in all Bronze flows.
+        columns:
+          - name: name
+            description: "{{ doc('matched_name') }}"
+          - name: ticker_bourso
+            description: "{{ doc('ticker_bourso') }}"
+          - name: isin
+            description: "{{ doc('isin') }}"
+          - name: detail_url
+            description: "Boursorama company detail page URL"
+          - name: last
+            description: "Last traded price at time of scrape"
+          - name: variation
+            description: "Daily price variation (%) at time of scrape"
+          - name: high
+            description: "Day high price at time of scrape"
+          - name: low
+            description: "Day low price at time of scrape"
+          - name: volume
+            description: "Traded volume at time of scrape (often null)"
+          - name: raw_data_ist_init
+            description: "Raw JSON market data blob from Boursorama data-ist-init attribute"
+          - name: ingested_at
+            description: "{{ doc('fetched_at') }}"
+
       - name: amf
         description: "Raw AMF regulatory documents ingested from info-financiere.gouv.fr"
 
@@ -190,6 +220,40 @@ sources:
           - name: Volume
             description: "Volume échangé sur la séance (nombre de titres)"
 
+      - name: amf_insider_signals
+        description: >
+          Data extracted from AMF (Autorité des Marchés Financiers) PDF filings using Large Language Models (Groq Llama 3.1).
+          This is an external source table populated by the Python orchestration pipeline, not a dbt-managed model.
+        columns:
+          - name: isin
+            description: "{{ doc('isin') }}"
+            tests:
+              - not_null
+          - name: societe
+            description: "The legal name of the issuing company, normalized from the Bronze layer metadata."
+          - name: ticker
+            description: "Stock market ticker symbol (e.g., ALNOV). Defaults to ISIN if the symbol is not explicitly found in the document."
+          - name: dirigeant
+            description: "Full name of the individual (insider) who performed the transaction."
+          - name: qualite
+            description: "The professional role or position of the insider (e.g., CEO, Board Member, or Closely Associated Person)."
+          - name: type_operation
+            description: "The nature of the transaction, such as 'Achat' (Purchase), 'Vente' (Sale), or 'Nomination'."
+          - name: montant
+            description: "Total monetary value of the transaction in EUR, extracted or calculated by the LLM."
+          - name: date_signal
+            description: "The specific date when the transaction took place, as declared in the filing."
+          - name: source_record_id
+            description: "Unique hash derived from the Bronze layer. Ensures idempotency by preventing duplicate processing of the same PDF."
+            tests:
+              - unique
+              - not_null
+          - name: url_doc
+            description: "Direct URL to the original source PDF document for auditability and verification."
+          - name: extraction_method
+            description: "Identifies the LLM model and parsing logic version (e.g., groq-llama-3.1-8b) used for the extraction."
+          - name: processed_at
+            description: "UTC timestamp indicating when the record was processed and inserted into the Silver layer."
   - name: gold
     database: bootcamp-project-pea-pme
     schema: gold
