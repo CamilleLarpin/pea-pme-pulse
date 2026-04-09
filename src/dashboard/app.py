@@ -192,7 +192,9 @@ def render_distribution(df: pd.DataFrame) -> None:
         annotation_position="top left",
     )
     fig.update_layout(height=300, bargap=0.05)
-    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": "hover", "displaylogo": False})
+    st.plotly_chart(
+        fig, use_container_width=True, config={"displayModeBar": "hover", "displaylogo": False}
+    )
     st.info(
         "La distribution symétrique autour de 5 est attendue : RSI et Bollinger sont neutres "
         "par défaut dans un marché normal."
@@ -230,7 +232,9 @@ Un score élevé correspond à beaucoup de 🟢 sur la même ligne.
             colorbar_ticktext=["Baissier (0)", "Neutre (1)", "Haussier (2)"],
         )
         fig.update_layout(height=280)
-        st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": "hover", "displaylogo": False})
+        st.plotly_chart(
+            fig, use_container_width=True, config={"displayModeBar": "hover", "displaylogo": False}
+        )
 
     with tab_top:
         _heatmap(df.head(10).copy())
@@ -272,7 +276,9 @@ def render_history(top_isins: tuple[str, ...]) -> None:
         annotation_position="bottom right",
     )
     fig_avg.update_layout(height=300, yaxis={"range": [0, 10]})
-    st.plotly_chart(fig_avg, use_container_width=True, config={"displayModeBar": "hover", "displaylogo": False})
+    st.plotly_chart(
+        fig_avg, use_container_width=True, config={"displayModeBar": "hover", "displaylogo": False}
+    )
 
     # ── Graphique 2 : score brut ───────────────────────────────────────────────
     st.caption("Score brut du jour · La ligne pointillée marque le seuil haussier (7).")
@@ -291,7 +297,9 @@ def render_history(top_isins: tuple[str, ...]) -> None:
         annotation_position="bottom right",
     )
     fig.update_layout(height=300, yaxis={"range": [0, 10]})
-    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": "hover", "displaylogo": False})
+    st.plotly_chart(
+        fig, use_container_width=True, config={"displayModeBar": "hover", "displaylogo": False}
+    )
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────

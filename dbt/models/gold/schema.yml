@@ -7,7 +7,7 @@ models:
       Grain: one row per (isin, date). is_latest=TRUE marks the most recent trading date per ISIN.
       Methodology: 5 technical signals (RSI, MACD, Golden Cross, Bollinger Bands, EMA trend) × 0/1/2 pts → score_technique ∈ [0, 10].
       NaN policy: indicator unavailable (warmup < required periods) → neutral score (+1), no penalty.
-      Use score_technique for point-in-time ranking, score_7d_avg for smoothed trend, is_latest to filter the current snapshot.
+      Use score_technique for point-in-time ranking, score_7d_avg / score_14d_avg for smoothed trend, is_latest to filter the current snapshot.
     columns:
       - name: isin
         description: "{{ doc('isin') }}"
@@ -53,6 +53,10 @@ models:
           - not_null
       - name: score_7d_avg
         description: "{{ doc('score_7d_avg') }}"
+        tests:
+          - not_null
+      - name: score_14d_avg
+        description: "{{ doc('score_14d_avg') }}"
         tests:
           - not_null
       - name: is_latest

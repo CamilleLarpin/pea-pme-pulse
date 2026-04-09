@@ -77,6 +77,16 @@ select
         ),
     1)                                                                      as score_7d_avg,
 
+    round(
+        avg(s.rsi_signal + s.macd_signal + s.golden_cross_signal
+            + s.bollinger_signal + s.trend_signal)
+        over (
+            partition by s.isin
+            order by s.Date
+            rows between 13 preceding and current row
+        ),
+    1)                                                                      as score_14d_avg,
+
     s.Date = max(s.Date) over (partition by s.isin)                         as is_latest
 
 from scored s

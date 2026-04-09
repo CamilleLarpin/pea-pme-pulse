@@ -138,6 +138,10 @@ Composite technical attractiveness score for a single trading day, in [0, 10]. S
 7-day rolling average of score_technique, computed over (partition by isin order by date rows between 6 preceding and current row). Rounded to 1 decimal. Smooths day-to-day volatility in the technical score and provides a short-term trend signal. Useful in the Daily Ranking Report to distinguish sustained performers from single-day spikes.
 {% enddocs %}
 
+{% docs score_14d_avg %}
+14-day rolling average of score_technique, computed over (partition by isin order by date rows between 13 preceding and current row). Rounded to 1 decimal. Filters out short-term noise and market events (e.g. correlated crash days) to reveal the sustained directional trend. Requires at least 14 trading days of history; NULL before that threshold (warmup). Displayed in the dashboard as the primary trend chart above the raw daily score.
+{% enddocs %}
+
 {% docs rsi_signal %}
 Technical signal derived from RSI_14. Scoring: RSI_14 < 35 (oversold) → 2.0 (bullish); 35 ≤ RSI_14 < 65 (neutral zone) → 1.0; RSI_14 ≥ 65 (overbought) → 0.0 (bearish); NULL (warmup period) → 1.0 (neutral, no penalty).
 Thresholds set at 35/65 (tighter than the classic 30/70) to improve discrimination in normal market conditions.
