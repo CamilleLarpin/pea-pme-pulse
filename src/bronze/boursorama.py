@@ -13,7 +13,7 @@ import json
 import re
 import time
 from datetime import UTC, datetime
-from typing import Any, Optional
+from typing import Any
 from urllib.parse import urljoin
 
 import requests
@@ -83,7 +83,7 @@ def _make_session() -> requests.Session:
 _SESSION = _make_session()
 
 
-def _fetch_html(url: str, params: Optional[dict] = None) -> str:
+def _fetch_html(url: str, params: dict | None = None) -> str:
     response = _SESSION.get(url, params=params, timeout=30)
     response.raise_for_status()
     return response.text
@@ -111,7 +111,7 @@ def _extract_json_like(text: str) -> Any:
     return {}
 
 
-def _find_first_value(obj: Any, keys: list[str]) -> Optional[Any]:
+def _find_first_value(obj: Any, keys: list[str]) -> Any | None:
     if isinstance(obj, dict):
         for key in keys:
             if key in obj and obj[key] not in (None, "", [], {}):
@@ -133,7 +133,7 @@ def _find_first_value(obj: Any, keys: list[str]) -> Optional[Any]:
 # ---------------------------------------------------------------------------
 
 
-def _parse_listing_row(tr) -> Optional[dict]:
+def _parse_listing_row(tr) -> dict | None:
     ticker_bourso = tr.get("data-ist")
     data_ist_init_raw = tr.get("data-ist-init", "")
 
@@ -183,7 +183,7 @@ def _scrape_listing_for_letter(letter: str) -> list[dict]:
     return rows
 
 
-def _extract_isin(detail_html: str) -> Optional[str]:
+def _extract_isin(detail_html: str) -> str | None:
     soup = BeautifulSoup(detail_html, "html.parser")
     h2 = soup.select_one("h2.c-faceplate__isin")
     if h2:
@@ -235,7 +235,7 @@ def fetch_companies() -> list[dict]:
 
         time.sleep(DELAY_SECONDS)
 
-    for idx, row in enumerate(all_rows, start=1):
+    for _idx, row in enumerate(all_rows, start=1):
         _enrich_with_isin(row)
         row["ingested_at"] = ingested_at
         time.sleep(DELAY_SECONDS)
