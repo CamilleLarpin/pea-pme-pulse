@@ -94,9 +94,6 @@ deployments:
     work_pool:
       name: bronze-pool
       work_queue_name: default
-      job_variables:
-        env:
-          GOOGLE_APPLICATION_CREDENTIALS_JSON: "{{ prefect.blocks.secret.gcp-sa-key }}"
 
   - name: bronze-abcbourse-rss
     version: "0.1.0"

@@ -23,14 +23,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
-# GCP credentials — same pattern as other flows
-_gcp_creds_json = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS_JSON")
-if _gcp_creds_json and not os.environ.get("GOOGLE_APPLICATION_CREDENTIALS"):
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as _tmp:
-        _tmp.write(_gcp_creds_json)
-    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = _tmp.name  # noqa: E402
-
-from prefect import flow, get_run_logger, task  # noqa: E402
+from prefect import flow, get_run_logger, task
 
 DBT_PROJECT_DIR = Path(__file__).parent.parent.parent / "dbt"
 GCP_PROJECT = "bootcamp-project-pea-pme"
@@ -56,36 +49,27 @@ def dbt_run_yahoo_ohlcv_clean() -> None:
         str(DBT_PROJECT_DIR),
     ]
 
-    if keyfile:
-        # Prefect managed — build a service-account profile at runtime
-        profiles = f"""pea_pme_pulse:
+    method = "service-account" if keyfile else "oauth"
+    extra = f"      keyfile: {keyfile}\n" if keyfile else ""
+    profiles = f"""pea_pme_pulse:
   target: prod
   outputs:
     prod:
       type: bigquery
-      method: service-account
+      method: {method}
       project: {GCP_PROJECT}
       dataset: silver
       threads: 4
       timeout_seconds: 300
       location: EU
-      keyfile: {keyfile}
-"""
-        with tempfile.TemporaryDirectory() as profiles_dir:
-            (Path(profiles_dir) / "profiles.yml").write_text(profiles)
-            result = subprocess.run(
-                cmd + ["--profiles-dir", profiles_dir],
-                capture_output=True,
-                text=True,
-            )
-            logger.info("dbt stdout:\n%s", result.stdout)
-            if result.returncode != 0:
-                logger.error("dbt stderr:\n%s", result.stderr)
-                raise RuntimeError(f"dbt run failed (exit {result.returncode})")
-    else:
-        # Local dev — use ~/.dbt/profiles.yml
-        logger.info("GOOGLE_APPLICATION_CREDENTIALS not set — using local dbt profile")
-        result = subprocess.run(cmd, capture_output=True, text=True)
+{extra}"""
+    with tempfile.TemporaryDirectory() as profiles_dir:
+        (Path(profiles_dir) / "profiles.yml").write_text(profiles)
+        result = subprocess.run(
+            cmd + ["--profiles-dir", profiles_dir],
+            capture_output=True,
+            text=True,
+        )
         logger.info("dbt stdout:\n%s", result.stdout)
         if result.returncode != 0:
             logger.error("dbt stderr:\n%s", result.stderr)
@@ -130,34 +114,27 @@ def dbt_run_stocks_score() -> None:
         str(DBT_PROJECT_DIR),
     ]
 
-    if keyfile:
-        profiles = f"""pea_pme_pulse:
+    method = "service-account" if keyfile else "oauth"
+    extra = f"      keyfile: {keyfile}\n" if keyfile else ""
+    profiles = f"""pea_pme_pulse:
   target: prod
   outputs:
     prod:
       type: bigquery
-      method: service-account
+      method: {method}
       project: {GCP_PROJECT}
       dataset: gold
       threads: 4
       timeout_seconds: 300
       location: EU
-      keyfile: {keyfile}
-"""
-        with tempfile.TemporaryDirectory() as profiles_dir:
-            (Path(profiles_dir) / "profiles.yml").write_text(profiles)
-            result = subprocess.run(
-                cmd + ["--profiles-dir", profiles_dir],
-                capture_output=True,
-                text=True,
-            )
-            logger.info("dbt stdout:\n%s", result.stdout)
-            if result.returncode != 0:
-                logger.error("dbt stderr:\n%s", result.stderr)
-                raise RuntimeError(f"dbt run failed (exit {result.returncode})")
-    else:
-        logger.info("GOOGLE_APPLICATION_CREDENTIALS not set — using local dbt profile")
-        result = subprocess.run(cmd, capture_output=True, text=True)
+{extra}"""
+    with tempfile.TemporaryDirectory() as profiles_dir:
+        (Path(profiles_dir) / "profiles.yml").write_text(profiles)
+        result = subprocess.run(
+            cmd + ["--profiles-dir", profiles_dir],
+            capture_output=True,
+            text=True,
+        )
         logger.info("dbt stdout:\n%s", result.stdout)
         if result.returncode != 0:
             logger.error("dbt stderr:\n%s", result.stderr)
