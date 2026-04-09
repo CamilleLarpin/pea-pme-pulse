@@ -1,0 +1,27 @@
+# Configuration documentation:
+# https://docs.getnao.io/nao-agent/context-builder/configuration#nao_config-yaml
+#
+# Copy this file to nao_config.yaml and fill in your Gemini API key.
+# nao_config.yaml is gitignored — never commit it.
+
+project_name: pea-pme-pulse
+databases:
+- type: bigquery
+  name: bigquery-prod
+  include: []
+  exclude: []
+  templates:
+  - columns
+  - how_to_use
+  profiling:
+    refresh_policy: always
+    interval_days: 7
+  project_id: bootcamp-project-pea-pme
+  dataset_id: gold
+  sso: true
+  partition_filters: {}
+repos: []
+llm:
+  provider: gemini
+  api_key: YOUR_GEMINI_API_KEY
+  annotation_model: gemini-2.5-flash
