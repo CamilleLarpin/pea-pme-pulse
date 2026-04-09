@@ -164,32 +164,68 @@ def test_build_where_clause_raises_on_invalid_isin() -> None:
 # ============================================================================
 
 
-def test_load_targets_reads_and_filters_csv(tmp_path: Path) -> None:
+def test_load_targets_reads_isin_and_ticker_bourso_from_csv(tmp_path: Path) -> None:
     csv_file = tmp_path / "companies.csv"
 
     with open(csv_file, "w", encoding="utf-8", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=["isin", "name"])
+        writer = csv.DictWriter(f, fieldnames=["isin", "ticker_bourso", "name"])
         writer.writeheader()
-        writer.writerow({"isin": "FR0000120271", "name": "A"})
-        writer.writerow({"isin": "fr0000120271", "name": "A duplicate lowercase"})
-        writer.writerow({"isin": "US0378331005", "name": "B"})
-        writer.writerow({"isin": "INVALID", "name": "Bad"})
-        writer.writerow({"isin": "", "name": "Empty"})
+        writer.writerow({"isin": "FR0000120271", "ticker_bourso": "1rPAAA", "name": "A"})
+        writer.writerow(
+            {
+                "isin": "fr0000120271",
+                "ticker_bourso": "1rPAAA_DUP",
+                "name": "A duplicate lowercase",
+            }
+        )
+        writer.writerow({"isin": "US0378331005", "ticker_bourso": "AAPL", "name": "B"})
+        writer.writerow({"isin": "INVALID", "ticker_bourso": "BAD", "name": "Bad"})
+        writer.writerow({"isin": "", "ticker_bourso": "EMPTY", "name": "Empty"})
 
     result = mod.load_targets(str(csv_file))
 
-    assert result == {"FR0000120271", "US0378331005"}
+    assert result == {
+        "FR0000120271": "1rPAAA",
+        "US0378331005": "AAPL",
+    }
+
+
+def test_load_targets_keeps_first_non_empty_ticker_for_duplicate_isin(tmp_path: Path) -> None:
+    csv_file = tmp_path / "companies.csv"
+
+    with open(csv_file, "w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=["isin", "ticker_bourso"])
+        writer.writeheader()
+        writer.writerow({"isin": "FR0000120271", "ticker_bourso": ""})
+        writer.writerow({"isin": "FR0000120271", "ticker_bourso": "1rPAAA"})
+        writer.writerow({"isin": "FR0000120271", "ticker_bourso": "1rPAAA_LATER"})
+
+    result = mod.load_targets(str(csv_file))
+
+    assert result == {"FR0000120271": "1rPAAA"}
 
 
 def test_load_targets_raises_if_missing_isin_column(tmp_path: Path) -> None:
     csv_file = tmp_path / "companies.csv"
 
     with open(csv_file, "w", encoding="utf-8", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=["foo"])
+        writer = csv.DictWriter(f, fieldnames=["foo", "ticker_bourso"])
         writer.writeheader()
-        writer.writerow({"foo": "bar"})
+        writer.writerow({"foo": "bar", "ticker_bourso": "ABC"})
 
     with pytest.raises(ValueError, match="CSV must contain an 'isin' column"):
+        mod.load_targets(str(csv_file))
+
+
+def test_load_targets_raises_if_missing_ticker_bourso_column(tmp_path: Path) -> None:
+    csv_file = tmp_path / "companies.csv"
+
+    with open(csv_file, "w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=["isin", "name"])
+        writer.writeheader()
+        writer.writerow({"isin": "FR0000120271", "name": "ACME"})
+
+    with pytest.raises(ValueError, match="CSV must contain a 'ticker_bourso' column"):
         mod.load_targets(str(csv_file))
 
 
@@ -212,6 +248,7 @@ def test_build_clean_record_maps_fields_correctly() -> None:
 
     result = mod.build_clean_record(
         record,
+        ticker="1rPACME",
         run_id="run-001",
         ingestion_ts="2026-04-01T10:00:00+00:00",
     )
@@ -220,6 +257,7 @@ def test_build_clean_record_maps_fields_correctly() -> None:
         "record_id": "abc123",
         "societe": "ACME SA",
         "isin": "FR0000120271",
+        "ticker": "1rPACME",
         "publication_ts": "2025-01-31T00:00:00+00:00",
         "pdf_url": "https://example.com/file.pdf",
         "titre": "Communiqué",
@@ -241,7 +279,14 @@ def test_extract_data_writes_raw_and_clean_files_and_counts(
     sample_config: mod.Config,
     sample_run_context: mod.RunContext,
 ) -> None:
-    mocker.patch.object(mod, "load_targets", return_value={"FR0000120271", "US0378331005"})
+    mocker.patch.object(
+        mod,
+        "load_targets",
+        return_value={
+            "FR0000120271": "1rPACME",
+            "US0378331005": "AAPL",
+        },
+    )
     mocker.patch.object(mod, "build_requests_session", return_value=Mock())
     mocker.patch.object(mod, "isoformat_utc", side_effect=lambda dt: "2026-04-02T10:00:00+00:00")
 
@@ -329,6 +374,8 @@ def test_extract_data_writes_raw_and_clean_files_and_counts(
 
     assert clean_records[0]["record_id"] == "id-1"
     assert clean_records[1]["record_id"] == "id-2"
+    assert clean_records[0]["ticker"] == "1rPACME"
+    assert clean_records[1]["ticker"] == "AAPL"
     assert clean_records[0]["run_id"] == sample_run_context.run_id
     assert clean_records[0]["source"] == mod.DATA_SOURCE
 
@@ -474,6 +521,9 @@ def test_inject_bq_calls_expected_steps(
     query_arg = fake_client.query.call_args.args[0]
     assert f"MERGE `{sample_config.full_table_id}` AS T" in query_arg
     assert f"USING `{temp_table_id}` AS S" in query_arg
+    assert "T.ticker = S.ticker" in query_arg
+    assert "ticker," in query_arg
+    assert "S.ticker" in query_arg
     assert "WHEN MATCHED THEN" in query_arg
     assert "WHEN NOT MATCHED THEN" in query_arg
 

@@ -5,6 +5,22 @@ version: 2
 # All column descriptions reference definitions.md via {{ doc('...') }} — do not define concepts inline.
 
 sources:
+  - name: work
+    database: bootcamp-project-pea-pme
+    schema: work
+    tables:
+      - name: amf_financial_signal_staging
+        description: "Raw staging table populated by the AMF financial signal extraction pipeline."
+        columns:
+          - name: record_id
+            description: "Unique AMF document identifier."
+          - name: extraction_status
+            description: "Technical extraction status from the pipeline."
+          - name: financial_signal_run_id
+            description: "Run id of the silver extraction pipeline."
+          - name: extracted_at
+            description: "Timestamp when the extraction row was produced."
+
   - name: bronze
     database: bootcamp-project-pea-pme
     schema: bronze
