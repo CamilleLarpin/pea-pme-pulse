@@ -28,6 +28,7 @@ dependencies = [
     "pdfplumber",
     "streamlit (>=1.56.0,<2.0.0)",
     "plotly (>=6.6.0,<7.0.0)",
+    "matplotlib (>=3.10.8,<4.0.0)",
 ]
 
 [project.optional-dependencies]

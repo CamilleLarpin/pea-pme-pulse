@@ -2,12 +2,8 @@ import os
 
 import pandas as pd
 import plotly.express as px
+import requests
 import streamlit as st
-from google.cloud import bigquery
-from google.oauth2 import service_account
-
-GCP_PROJECT = os.environ.get("GCP_PROJECT_ID", "bootcamp-project-pea-pme")
-GOLD_DATASET = "gold"
 
 SIGNAL_LABELS = {
     "rsi_signal": "RSI (momentum)",
@@ -23,23 +19,15 @@ PERIOD_DAYS = {"30 jours": 30, "3 mois": 90, "6 mois": 180, "1 an": 365}
 SIGNAL_EMOJI = {0: "🔴", 1: "🟡", 2: "🟢"}
 
 
-# ── Auth ──────────────────────────────────────────────────────────────────────
+# ── API ───────────────────────────────────────────────────────────────────────
 
 
-@st.cache_resource
-def get_bq_client() -> bigquery.Client:
-    """Use Streamlit secrets on Cloud, ADC locally."""
+def get_api_base_url() -> str:
     try:
-        gcp_secret = st.secrets.get("gcp_service_account")
+        url = st.secrets.get("api_base_url")
     except Exception:
-        gcp_secret = None
-    if gcp_secret:
-        creds = service_account.Credentials.from_service_account_info(
-            gcp_secret,
-            scopes=["https://www.googleapis.com/auth/cloud-platform"],
-        )
-        return bigquery.Client(project=GCP_PROJECT, credentials=creds)
-    return bigquery.Client(project=GCP_PROJECT)
+        url = None
+    return url or os.environ.get("API_BASE_URL", "http://localhost:8000")
 
 
 # ── Data loading ──────────────────────────────────────────────────────────────
@@ -47,39 +35,22 @@ def get_bq_client() -> bigquery.Client:
 
 @st.cache_data(ttl=3600)
 def load_latest_scores() -> pd.DataFrame:
-    client = get_bq_client()
-    query = f"""
-        SELECT
-            isin,
-            company_name,
-            yf_ticker,
-            date,
-            Close,
-            score_technique,
-            rsi_signal,
-            macd_signal,
-            golden_cross_signal,
-            bollinger_signal,
-            trend_signal
-        FROM `{GCP_PROJECT}.{GOLD_DATASET}.stocks_score`
-        WHERE is_latest = TRUE
-        ORDER BY score_technique DESC
-    """
-    return client.query(query).to_dataframe()
+    resp = requests.get(f"{get_api_base_url()}/gold/stocks-score/latest", timeout=30)
+    resp.raise_for_status()
+    df = pd.DataFrame(resp.json())
+    df = df.rename(columns={"close": "Close"})
+    return df
 
 
 @st.cache_data(ttl=3600)
 def load_score_history(isins: tuple[str, ...], days: int) -> pd.DataFrame:
-    client = get_bq_client()
-    isin_list = ", ".join(f"'{i}'" for i in isins)
-    query = f"""
-        SELECT isin, company_name, date, score_technique
-        FROM `{GCP_PROJECT}.{GOLD_DATASET}.stocks_score`
-        WHERE isin IN ({isin_list})
-          AND date >= DATE_SUB(CURRENT_DATE(), INTERVAL {days} DAY)
-        ORDER BY isin, date
-    """
-    return client.query(query).to_dataframe()
+    resp = requests.get(
+        f"{get_api_base_url()}/gold/stocks-score/history",
+        params={"isins": list(isins), "days": days},
+        timeout=30,
+    )
+    resp.raise_for_status()
+    return pd.DataFrame(resp.json())
 
 
 # ── Layout ────────────────────────────────────────────────────────────────────
@@ -320,7 +291,7 @@ def main() -> None:
     st.title("📈 PEA-PME Pulse — Tableau de bord")
     st.caption("Scoring technique quotidien · Données BigQuery · Mise à jour toutes les heures")
 
-    with st.spinner("Chargement des données BigQuery..."):
+    with st.spinner("Chargement des données..."):
         df = load_latest_scores()
 
     if df.empty:
