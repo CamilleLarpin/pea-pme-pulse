@@ -235,7 +235,7 @@ def fetch_companies() -> list[dict]:
 
         time.sleep(DELAY_SECONDS)
 
-    for _idx, row in enumerate(all_rows, start=1):
+    for row in enumerate(all_rows, start=1):
         _enrich_with_isin(row)
         row["ingested_at"] = ingested_at
         time.sleep(DELAY_SECONDS)

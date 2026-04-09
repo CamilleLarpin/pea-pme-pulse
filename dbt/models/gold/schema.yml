@@ -122,3 +122,32 @@ models:
         description: "{{ doc('score_date') }}"
         tests:
           - not_null
+          
+  - name: score_insider
+    description: >
+      Gold layer model computing a normalized Investment Score (1–10) based on AMF insider trading signals.
+      It aggregates individual trades into daily company snapshots.
+    columns:
+      - name: isin
+        description: "{{ doc('isin') }}"
+        tests:
+          - not_null
+          - unique
+      - name: societe
+        description: "Canonical company name from the referential."
+      - name: signal_date
+        description: "The disclosure date of the trade, used as the timeline anchor."
+        tests:
+          - not_null
+      - name: insider_names
+        description: "List of the specific insiders (CEOs, Directors, etc.) who performed the trades."
+      - name: num_operations
+        description: "Total number of distinct transaction records reported for this company on this date."
+      - name: total_amount
+        description: "Aggregated monetary value (EUR) of all insider transactions for this snapshot."
+      - name: raw_score
+        description: "Pre-normalized score calculated as log10(volume) multiplied by the cluster bonus."
+      - name: score_1_10
+        description: "Final normalized 1-10 conviction score. 10 indicates high-volume/high-conviction buying."
+        tests:
+          - not_null

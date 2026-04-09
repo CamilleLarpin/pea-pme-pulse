@@ -14,7 +14,7 @@ pull:
       repository: https://github.com/CamilleLarpin/pea-pme-pulse.git
       branch: main
   - prefect.deployments.steps.run_shell_script:
-      script: pip install -e ".[dev]"
+      script: pip install ".[dev]"
       directory: "{{ git_clone.directory }}"
 
 deployments:
@@ -84,6 +84,10 @@ deployments:
     work_pool:
       name: bronze-pool
       work_queue_name: default
+      job_variables:
+        env:
+          GCP_PROJECT_ID: "bootcamp-project-pea-pme"
+          GCS_BUCKET_NAME: "project-pea-pme"
 
   - name: silver-yfinance-ohlcv
     version: "0.1.0"
