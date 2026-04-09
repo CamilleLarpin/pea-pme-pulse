@@ -44,13 +44,21 @@ class TestRsiSignal:
         df = compute_stocks_score(_make_row(RSI_14=float("nan")))
         assert df["rsi_signal"].iloc[0] == 1.0
 
-    def test_boundary_30_is_neutral(self):
-        df = compute_stocks_score(_make_row(RSI_14=30.0))
+    def test_boundary_35_is_neutral(self):
+        df = compute_stocks_score(_make_row(RSI_14=35.0))
         assert df["rsi_signal"].iloc[0] == 1.0
 
-    def test_boundary_70_is_bearish(self):
-        df = compute_stocks_score(_make_row(RSI_14=70.0))
+    def test_boundary_65_is_bearish(self):
+        df = compute_stocks_score(_make_row(RSI_14=65.0))
         assert df["rsi_signal"].iloc[0] == 0.0
+
+    def test_rsi_34_is_bullish(self):
+        df = compute_stocks_score(_make_row(RSI_14=34.0))
+        assert df["rsi_signal"].iloc[0] == 2.0
+
+    def test_rsi_64_is_neutral(self):
+        df = compute_stocks_score(_make_row(RSI_14=64.0))
+        assert df["rsi_signal"].iloc[0] == 1.0
 
 
 class TestMacdSignal:
@@ -96,6 +104,26 @@ class TestBollingerSignal:
 
     def test_bb_nan_gives_1(self):
         df = compute_stocks_score(_make_row(BB_lower=float("nan"), BB_upper=float("nan")))
+        assert df["bollinger_signal"].iloc[0] == 1.0
+
+    def test_pct_b_low_gives_2(self):
+        # %B = 0.1 (Close dans les 10% bas de la bande) -> haussier
+        df = compute_stocks_score(_make_row(Close=92.0, BB_lower=90.0, BB_upper=110.0))
+        assert df["bollinger_signal"].iloc[0] == 2.0
+
+    def test_pct_b_high_gives_0(self):
+        # %B = 0.9 (Close dans les 10% hauts de la bande) -> baissier
+        df = compute_stocks_score(_make_row(Close=108.0, BB_lower=90.0, BB_upper=110.0))
+        assert df["bollinger_signal"].iloc[0] == 0.0
+
+    def test_pct_b_boundary_02_is_neutral(self):
+        # %B = 0.2 exactement -> neutre (borne non incluse)
+        df = compute_stocks_score(_make_row(Close=94.0, BB_lower=90.0, BB_upper=110.0))
+        assert df["bollinger_signal"].iloc[0] == 1.0
+
+    def test_pct_b_boundary_08_is_neutral(self):
+        # %B = 0.8 exactement -> neutre (borne non incluse)
+        df = compute_stocks_score(_make_row(Close=106.0, BB_lower=90.0, BB_upper=110.0))
         assert df["bollinger_signal"].iloc[0] == 1.0
 
 
