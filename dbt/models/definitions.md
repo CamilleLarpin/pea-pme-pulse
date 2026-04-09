@@ -139,7 +139,8 @@ Composite technical attractiveness score for a single trading day, in [0, 10]. S
 {% enddocs %}
 
 {% docs rsi_signal %}
-Technical signal derived from RSI_14. Scoring: RSI_14 < 30 (oversold) → 2.0 (bullish); 30 ≤ RSI_14 < 70 (neutral zone) → 1.0; RSI_14 ≥ 70 (overbought) → 0.0 (bearish); NULL (warmup period) → 1.0 (neutral, no penalty).
+Technical signal derived from RSI_14. Scoring: RSI_14 < 35 (oversold) → 2.0 (bullish); 35 ≤ RSI_14 < 65 (neutral zone) → 1.0; RSI_14 ≥ 65 (overbought) → 0.0 (bearish); NULL (warmup period) → 1.0 (neutral, no penalty).
+Thresholds set at 35/65 (tighter than the classic 30/70) to improve discrimination in normal market conditions.
 {% enddocs %}
 
 {% docs macd_signal %}
@@ -151,7 +152,9 @@ Technical signal based on the SMA_50 / SMA_200 relationship. Scoring: SMA_50 > S
 {% enddocs %}
 
 {% docs bollinger_signal %}
-Technical signal based on closing price position relative to Bollinger Bands. Scoring: Close < BB_lower (oversold / outside lower band) → 2.0 (mean-reversion buy signal); Close > BB_upper (overbought / outside upper band) → 0.0; Close within bands → 1.0 (neutral); either band NULL (warmup < 20 bars) → 1.0.
+Technical signal based on Bollinger %B: %B = (Close - BB_lower) / (BB_upper - BB_lower). Measures where within the band the price sits.
+Scoring: %B < 0.2 (lower 20% of band — mean-reversion buy zone) → 2.0 (bullish); %B > 0.8 (upper 20% — overextended) → 0.0 (bearish); 0.2 ≤ %B ≤ 0.8 (middle 60%) → 1.0 (neutral); either band NULL (warmup < 20 bars) → 1.0.
+Replaces the simpler inside/outside binary: ~95% of prices naturally fall within Bollinger Bands, making the old logic always neutral. %B thresholds at 0.2/0.8 give a signal to ~40% of stocks.
 {% enddocs %}
 
 {% docs trend_signal %}

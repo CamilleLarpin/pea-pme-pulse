@@ -8,9 +8,9 @@ with scored as (
         Close,
 
         case
-            when RSI_14 < 30  then 2.0
-            when RSI_14 < 70  then 1.0
-            when RSI_14 >= 70 then 0.0
+            when RSI_14 < 35  then 2.0
+            when RSI_14 < 65  then 1.0
+            when RSI_14 >= 65 then 0.0
             else 1.0
         end as rsi_signal,
 
@@ -27,9 +27,9 @@ with scored as (
         end as golden_cross_signal,
 
         case
-            when BB_lower is null or BB_upper is null then 1.0
-            when Close < BB_lower                     then 2.0
-            when Close > BB_upper                     then 0.0
+            when BB_lower is null or BB_upper is null                          then 1.0
+            when (Close - BB_lower) / nullif(BB_upper - BB_lower, 0) < 0.2    then 2.0
+            when (Close - BB_lower) / nullif(BB_upper - BB_lower, 0) > 0.8    then 0.0
             else 1.0
         end as bollinger_signal,
 
