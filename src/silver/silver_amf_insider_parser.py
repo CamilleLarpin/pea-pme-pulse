@@ -169,7 +169,7 @@ def extract_text_from_pdf(url):
         return None
 
 
-def parse_insider_data(text, doc_info):
+def parse_insider_data(text, doc_info, env):
     """
     Extracts ALL insider trading signals from a document.
     Returns a LIST of JSON strings, one for each transaction found.
@@ -177,7 +177,7 @@ def parse_insider_data(text, doc_info):
     Args:
         text (str): The raw text extracted from the PDF document.
         doc_info (dict): Dictionary containing metadata (societe, record_id, pdf_url).
-
+        env (dict): Environment variables, including API keys for Groq.
     Returns:
         list[str]: A list of JSON-formatted strings, each representing a transaction.
                    Returns None if no text is provided or an error occurs.
@@ -226,7 +226,10 @@ def parse_insider_data(text, doc_info):
                     "role": "system",
                     "content": "You are a financial analyst. You output ONLY valid JSON. If multiple directors are present, extract each one.",
                 },
-                {"role": "user", "content": context_prompt + "\n\nTEXT:\n" + clean_text},
+                {
+                    "role": "user",
+                    "content": context_prompt + "\n\nTEXT:\n" + clean_text,
+                },
             ],
             response_format={"type": "json_object"},
         )
@@ -417,7 +420,7 @@ def upload_full_json_to_bigquery(rows, project_id, dataset_id, table_id):
         logger.error(f"❌ Critical error uploading to table '{table_id}': {e}")
 
 
-def extract_insider_signals(all_documents):
+def extract_insider_signals(all_documents, env):
     """
     Processes a list of documents to extract insider trading signals using AI.
     Handles multiple signals per document (e.g., cases with multiple directors).
@@ -445,7 +448,7 @@ def extract_insider_signals(all_documents):
         logger.info(f"Text extracted ({len(text)} chars). Calling AI...")
 
         # 2. AI Extraction (Groq/Llama)
-        result_json_list = parse_insider_data(text, doc)
+        result_json_list = parse_insider_data(text, doc, env)
 
         if result_json_list is None:
             logger.critical(
@@ -527,7 +530,7 @@ def filter_insider_text(text):
 # ---------------------------------------------------------------------------
 
 
-def run() -> None:
+def run(env) -> None:
     """
     Main orchestration function for the AMF Insider Trading pipeline.
 
@@ -590,7 +593,7 @@ def run() -> None:
         # AI Extraction: trigger the Groq/Llama extraction only on the filtered list of documents
         if docs_to_process:
             logger.info(f"📊 Starting AI extraction on {len(docs_to_process)} new documents...")
-            final_payload = extract_insider_signals(docs_to_process)
+            final_payload = extract_insider_signals(docs_to_process, env)
 
             # PHASE 5: Save to BigQuery (Silver Layer)
             if final_payload:
@@ -611,18 +614,19 @@ def run() -> None:
         logger.critical(f"Critical failure in processing pipeline: {e}")
 
 
-# Load environment variables (API keys, Project IDs, etc.)
-env = load_and_log_environment()
-
 if __name__ == "__main__":
     """
     Entry point for the AMF Insider Parser pipeline.
     Initializes logging and triggers the orchestration flow.
-    
-    Input: 
+
+    Input:
         Environment variables loaded via load_and_log_environment().
-    Output: 
+    Output:
         Execution of the 'run()' pipeline and log entries in the console/file.
     """
+    # Load environment variables (API keys, Project IDs, etc.)
+    global env
+    env = load_and_log_environment()
+
     logger.info("Pipeline 'amf_insider_parser' started.")
-    run()
+    run(env)

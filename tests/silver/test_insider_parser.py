@@ -46,11 +46,7 @@ def load_and_log_environment():
     return config
 
 
-# Global environment variable for the module
-env = load_and_log_environment()
-
-
-def test_basic_flow():
+def test_basic_flow(env):
     """
     Main test function to verify AI parsing and insider validation logic.
     """
@@ -80,7 +76,7 @@ def test_basic_flow():
     # We pass the env dictionary if your function requires it,
     # otherwise it uses the one in its own module.
     logger.info("Sending data to AI for parsing...")
-    extracted_signals = parse_insider_data(mock_pdf_text, mock_doc_info)
+    extracted_signals = parse_insider_data(mock_pdf_text, mock_doc_info, env)
 
     if not extracted_signals:
         logger.warning("No signals were extracted. Check API logs.")
@@ -94,10 +90,15 @@ def test_basic_flow():
 
             # Use the imported validation function
             if is_valid_insider(
-                signal.get("dirigeant"), signal.get("type_operation"), signal.get("date_signal")
+                signal.get("dirigeant"),
+                signal.get("type_operation"),
+                signal.get("date_signal"),
             ):
                 signal.update(
-                    {"isin": mock_doc_info["isin"], "processed_at": "2026-04-09T10:00:00"}
+                    {
+                        "isin": mock_doc_info["isin"],
+                        "processed_at": "2026-04-09T10:00:00",
+                    }
                 )
                 final_payload.append(signal)
                 logger.success(f"VALIDATED: {signal.get('dirigeant')} | {signal.get('montant')}€")
@@ -111,6 +112,10 @@ def test_basic_flow():
 
 if __name__ == "__main__":
     try:
-        test_basic_flow()
+        # Load environment variables (API keys, Project IDs, etc.)
+        env = load_and_log_environment()
+
+        test_basic_flow(env)
+
     except Exception as e:
         logger.error(f"Test crashed with error: {e}")
