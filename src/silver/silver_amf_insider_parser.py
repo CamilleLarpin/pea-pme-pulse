@@ -14,7 +14,7 @@ from google.cloud.exceptions import NotFound
 from groq import Groq
 from loguru import logger
 
-# Configuration for BigQuery and Groq
+# Configuration for BigQuery table names (using global constants for consistency across the codebase)
 GCP_PREFIX_INPUT_TABLE_ID = "amf"
 GCP_PREFIX_OUTPUT_TABLE_ID = "amf_insider_signals"
 
@@ -46,7 +46,6 @@ def load_and_log_environment():
         "BQ_DATASET_BRONZE": os.getenv("BQ_DATASET_BRONZE"),
         "BQ_DATASET_SILVER": os.getenv("BQ_DATASET_SILVER"),
         "GROQ_API_KEY": os.getenv("GROQ_API_KEY"),
-        "GEMINI_API_KEY": os.getenv("GEMINI_API_KEY"),
     }
 
     logger.info("--- Environment Configuration Check ---")
@@ -87,7 +86,12 @@ def load_from_bigquery(project_id, dataset_id, table_id):
     logger.info(f"📊 Fetching documents from: {table_path}")
 
     # SQL Query: Filters for confirmed 'success' downloads and valid insider signals
-    if dataset_id == "bronze":
+    # Constraint: LIMIT 12
+    # Reason: This limit is implemented to ensure the total payload remains within the Groq LPU™ context window
+    # (approx. 100k tokens). Since each PDF extraction contributes significantly to the token count, fetching
+    # more than 12 records simultaneously risks exceeding the token limit and triggering a 413 Request Entity
+    # Too Large or ContextWindowExceeded error.
+    if dataset_id == os.getenv("BQ_DATASET_BRONZE"):
         logger.info(
             "Applying Bronze layer filters: Only 'success' downloads with insider-related titles from the last 90 days."
         )
@@ -115,7 +119,7 @@ def load_from_bigquery(project_id, dataset_id, table_id):
             ORDER BY publication_ts DESC
             LIMIT 12
             """
-    elif dataset_id == "silver":
+    elif dataset_id == os.getenv("BQ_DATASET_SILVER"):
         logger.info(
             "Applying Silver layer filters: Only 'success' downloads with insider-related titles from the last 90 days, excluding already processed records."
         )
