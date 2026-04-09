@@ -159,8 +159,6 @@ sources:
           - name: ingested_at
             description: "{{ doc('fetched_at') }}"
 
-      - name: amf
-        description: "Raw AMF regulatory documents ingested from info-financiere.gouv.fr"
 
       - name: yfinance_ohlcv
         description: >

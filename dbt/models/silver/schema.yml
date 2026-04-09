@@ -93,47 +93,6 @@ models:
         tests:
           - not_null
 
-  - name: amf_documents
-    description: >
-      Cleaned AMF regulatory documents from bronze.amf.
-      Deduplicated by record_id, keeping the latest ingested row.
-      Silver layer contains only cleaned and standardized records.
-    columns:
-      - name: record_id
-        description: "Unique AMF record identifier"
-        tests:
-          - not_null
-          - unique
-      - name: isin
-        description: "ISIN of the matched company"
-        tests:
-          - not_null
-      - name: societe
-        description: "Company name from AMF source"
-      - name: publication_ts
-        description: "Publication timestamp parsed in bronze"
-      - name: pdf_url
-        description: "AMF document PDF URL"
-      - name: titre
-        description: "Document title"
-      - name: sous_type
-        description: "AMF sub-type of information"
-      - name: type_information
-        description: "AMF information type"
-      - name: source
-        description: "Source system name"
-        tests:
-          - not_null
-          - accepted_values:
-              arguments:
-                values: ['amf']
-      - name: run_id
-        description: "Ingestion run identifier"
-      - name: ingestion_ts
-        description: "Timestamp when the row was ingested"
-        tests:
-          - not_null
-
   - name: amf_financial_signal
     description: "Silver table containing deduplicated financial signals extracted from AMF PDFs."
     columns:
@@ -220,3 +179,6 @@ models:
         description: "Timestamp when the silver model was built."
         tests:
           - not_null
+
+      - name: llm_prompt_version_num
+        description: "Version numérique extraite de llm_prompt_version pour permettre un tri correct entre v1, v2, v10, etc."

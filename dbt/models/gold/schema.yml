@@ -151,3 +151,71 @@ models:
         description: "Final normalized 1-10 conviction score. 10 indicates high-volume/high-conviction buying."
         tests:
           - not_null
+
+  - name: financials_score
+    description: >
+      Fundamental financial score per PEA-PME company — one row per (ticker, date_cloture_exercice).
+      Grain: one row per (ticker, date_cloture_exercice). Updated semi-annually or annually as new financial
+      documents are extracted from AMF filings.
+      Methodology: Z-score pondéré sur 4 métriques fondamentales → score_fondamental ∈ [0, 10].
+        - ca_growth    (25%) : croissance du chiffre d'affaires
+        - marge_op     (30%) : marge opérationnelle
+        - levier       (25%) : dette nette / EBITDA (inversé — moins de levier = meilleur score)
+        - fcf_yield    (20%) : FCF / CA (proxy rendement cash)
+      Winsorisation à 5%/95% par métrique pour limiter l'effet outliers.
+      Pondération dynamique : les poids sont redistribués sur les métriques disponibles.
+      Éligibilité : au moins 2 métriques disponibles sur 4 (nb_metrics >= 2).
+      coverage_score ∈ [0, 1] : somme des poids effectifs — indique la fiabilité du score.
+      Use score_fondamental for fundamental ranking, coverage_score to filter low-confidence scores.
+    columns:
+      - name: ticker
+        description: "{{ doc('ticker_bourso') }}"
+        tests:
+          - not_null
+      - name: date_cloture_exercice
+        description: "Date de clôture de l'exercice comptable (annuel ou semestriel) au format DATE."
+        tests:
+          - not_null
+      - name: score_fondamental
+        description: >
+          Score fondamental normalisé entre 0 et 10 via PERCENT_RANK sur le Z-score composite pondéré.
+          10 = meilleur profil fondamental dans la population courante.
+          0 = profil le plus dégradé. Score relatif à la population PEA-PME disponible à date d'extraction.
+        tests:
+          - not_null
+      - name: ca_growth_pct
+        description: "Croissance du chiffre d'affaires en % (valeur brute extraite du document AMF, avant winsorisation)."
+      - name: marge_op_pct
+        description: "Marge opérationnelle en % (valeur brute extraite du document AMF, avant winsorisation)."
+      - name: levier_dette_ebitda
+        description: "Ratio dette nette / EBITDA (dérivé des métriques silver). Null si EBITDA <= 0 ou manquant."
+      - name: fcf_yield_pct
+        description: "Free Cash Flow / CA en % (dérivé des métriques silver). Null si CA <= 0 ou manquant."
+      - name: z_ca_growth
+        description: "Z-score de ca_growth (après winsorisation). Null si métrique indisponible."
+      - name: z_marge_op
+        description: "Z-score de marge_op (après winsorisation). Null si métrique indisponible."
+      - name: z_levier
+        description: "Z-score du levier, inversé (−z) : un levier faible donne un z_levier positif. Null si métrique indisponible."
+      - name: z_fcf_yield
+        description: "Z-score du fcf_yield (après winsorisation). Null si métrique indisponible."
+      - name: z_composite
+        description: "Score composite = moyenne pondérée normalisée des Z-scores disponibles. Base du classement PERCENT_RANK."
+      - name: nb_metrics
+        description: "Nombre de métriques disponibles sur 4 pour ce ticker/période. Minimum requis : 2."
+        tests:
+          - not_null
+      - name: coverage_score
+        description: >
+          Somme des poids effectifs ∈ [0, 1]. Indique la fiabilité du score fondamental.
+          1.0 = les 4 métriques sont disponibles. < 0.5 = score basé sur peu de données, à interpréter avec prudence.
+        tests:
+          - not_null
+      - name: source
+        description: "Source du document financier (ex: amf)."
+      - name: financial_signal_run_id
+        description: "Identifiant du run d'extraction LLM ayant produit les métriques sources."
+      - name: extracted_at
+        description: "Timestamp d'extraction LLM des métriques financières sources (UTC)."
+      - name: scored_at
+        description: "Timestamp de calcul du score fondamental (UTC)."
