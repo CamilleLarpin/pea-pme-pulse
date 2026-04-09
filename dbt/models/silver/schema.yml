@@ -70,6 +70,29 @@ models:
       - name: ticker_bourso
         description: "Boursorama ticker of the matched company"
 
+  - name: companies
+    description: >
+      PEA-PME company referentiel — historised monthly snapshot from bronze.boursorama.
+      Grain: one row per (isin, snapshot_date). Each monthly pipeline run adds a new snapshot.
+      Use the latest snapshot_date to get the current referentiel.
+    columns:
+      - name: isin
+        description: "{{ doc('isin') }}"
+        tests:
+          - not_null
+      - name: name
+        description: "{{ doc('matched_name') }}"
+        tests:
+          - not_null
+      - name: ticker_bourso
+        description: "{{ doc('ticker_bourso') }}"
+        tests:
+          - not_null
+      - name: snapshot_date
+        description: "Date this row was captured — one snapshot per monthly pipeline run"
+        tests:
+          - not_null
+
   - name: amf_documents
     description: >
       Cleaned AMF regulatory documents from bronze.amf.

@@ -56,6 +56,39 @@ models:
         tests:
           - not_null
 
+  - name: company_scores
+    description: >
+      Enriched PEA-PME company list — one row per ISIN, rebuilt on every monthly pipeline run.
+      Grain: one row per ISIN. Left join: all 571 companies appear; score columns null when no articles exist yet.
+      Combines the latest silver.companies snapshot (name, ticker) with the current gold.score_news signal.
+      Use for company ranking, nao Talk To My Data, or composite scoring.
+    columns:
+      - name: isin
+        description: "{{ doc('isin') }}"
+        tests:
+          - not_null
+          - unique
+      - name: name
+        description: "{{ doc('matched_name') }}"
+        tests:
+          - not_null
+      - name: ticker_bourso
+        description: "{{ doc('ticker_bourso') }}"
+        tests:
+          - not_null
+      - name: snapshot_date
+        description: "Date of the latest silver.companies snapshot used"
+        tests:
+          - not_null
+      - name: investment_score
+        description: "{{ doc('investment_score') }}"
+      - name: mention_count_45d
+        description: "{{ doc('mention_count_45d') }}"
+      - name: avg_sentiment_45d
+        description: "{{ doc('avg_sentiment_45d') }}"
+      - name: score_date
+        description: "{{ doc('score_date') }}"
+
   - name: score_news
     description: >
       Daily investment news score per PEA-PME company — one row per ISIN, rebuilt on every pipeline run.
@@ -87,5 +120,34 @@ models:
           - not_null
       - name: score_date
         description: "{{ doc('score_date') }}"
+        tests:
+          - not_null
+          
+  - name: score_insider
+    description: >
+      Gold layer model computing a normalized Investment Score (1–10) based on AMF insider trading signals.
+      It aggregates individual trades into daily company snapshots.
+    columns:
+      - name: isin
+        description: "{{ doc('isin') }}"
+        tests:
+          - not_null
+          - unique
+      - name: societe
+        description: "Canonical company name from the referential."
+      - name: signal_date
+        description: "The disclosure date of the trade, used as the timeline anchor."
+        tests:
+          - not_null
+      - name: insider_names
+        description: "List of the specific insiders (CEOs, Directors, etc.) who performed the trades."
+      - name: num_operations
+        description: "Total number of distinct transaction records reported for this company on this date."
+      - name: total_amount
+        description: "Aggregated monetary value (EUR) of all insider transactions for this snapshot."
+      - name: raw_score
+        description: "Pre-normalized score calculated as log10(volume) multiplied by the cluster bonus."
+      - name: score_1_10
+        description: "Final normalized 1-10 conviction score. 10 indicates high-volume/high-conviction buying."
         tests:
           - not_null

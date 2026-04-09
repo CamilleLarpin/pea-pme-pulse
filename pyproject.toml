@@ -25,6 +25,7 @@ dependencies = [
     "groq",
     "fastapi",
     "uvicorn[standard]",
+    "pdfplumber",
 ]
 
 [project.optional-dependencies]
@@ -39,6 +40,10 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+pdfplumber = "^0.11.9" 
 
 [tool.ruff]
 line-length = 100

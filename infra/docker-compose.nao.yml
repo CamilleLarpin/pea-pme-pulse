@@ -1,0 +1,16 @@
+services:
+  nao:
+    build:
+      context: .
+      dockerfile: Dockerfile.nao
+    ports:
+      - "5005:5005"
+    environment:
+      - BETTER_AUTH_URL=http://35.241.252.5:5005
+    volumes:
+      - ./nao_config.yaml:/workspace/nao_config.yaml:ro
+      - nao-workspace:/workspace/data
+    restart: unless-stopped
+
+volumes:
+  nao-workspace:

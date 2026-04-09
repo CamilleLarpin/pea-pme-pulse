@@ -11,6 +11,13 @@ macro-paths: ["macros"]
 target-path: "target"
 clean-targets: ["target", "dbt_packages"]
 
+vars:
+  insider_weights:
+    achat_base_score: 100
+    vente_base_score: -50
+    cluster_bonus_weight: 0.5
+    max_log_amount: 6
+
 models:
   pea_pme_pulse:
     silver:

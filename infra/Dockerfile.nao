@@ -1,0 +1,7 @@
+FROM python:3.12-slim
+
+RUN pip install --no-cache-dir nao-core ibis-framework[bigquery]
+
+WORKDIR /workspace
+
+CMD ["bash", "-c", "mkdir -p repos databases && nao sync && nao chat"]
