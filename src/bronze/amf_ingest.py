@@ -91,6 +91,7 @@ BQ_SCHEMA: list[bigquery.SchemaField] = [
     bigquery.SchemaField("record_id", "STRING"),
     bigquery.SchemaField("societe", "STRING"),
     bigquery.SchemaField("isin", "STRING"),
+    bigquery.SchemaField("ticker", "STRING"),
     bigquery.SchemaField("publication_ts", "TIMESTAMP"),
     bigquery.SchemaField("pdf_url", "STRING"),
     bigquery.SchemaField("titre", "STRING"),
@@ -193,15 +194,27 @@ def prepare_run_context(prefix: str = f"{DATA_SOURCE}_ingest_") -> RunContext:
 # ============================================================================
 
 
-def load_targets(csv_path: str) -> set[str]:
-    targets: set[str] = set()
+def load_targets(csv_path: str) -> dict[str, str | None]:
+    """
+    Retourne un mapping :
+        {isin: ticker_bourso}
+
+    CSV attendu :
+        - colonne 'isin'
+        - colonne 'ticker_bourso'
+    """
+    targets: dict[str, str | None] = {}
     invalid_count = 0
 
     with open(csv_path, encoding="utf-8", newline="") as csv_file:
         reader = csv.DictReader(csv_file)
+        fieldnames = reader.fieldnames or []
 
-        if "isin" not in (reader.fieldnames or []):
+        if "isin" not in fieldnames:
             raise ValueError("CSV must contain an 'isin' column.")
+
+        if "ticker_bourso" not in fieldnames:
+            raise ValueError("CSV must contain a 'ticker_bourso' column.")
 
         for row in reader:
             raw_isin = (row.get("isin") or "").strip().upper()
@@ -213,7 +226,17 @@ def load_targets(csv_path: str) -> set[str]:
                 logger.warning("Invalid ISIN ignored: {}", raw_isin)
                 continue
 
-            targets.add(raw_isin)
+            raw_ticker = (row.get("ticker_bourso") or "").strip()
+            ticker = raw_ticker or None
+
+            # En cas de doublon d'ISIN dans le CSV :
+            # on garde le premier ticker non vide rencontré
+            if raw_isin in targets:
+                if targets[raw_isin] is None and ticker is not None:
+                    targets[raw_isin] = ticker
+                continue
+
+            targets[raw_isin] = ticker
 
     if invalid_count:
         logger.warning("{} invalid ISIN(s) ignored from CSV", invalid_count)
@@ -290,6 +313,7 @@ def fetch_export_jsonl(
 def build_clean_record(
     record: dict[str, object],
     *,
+    ticker: str | None,
     run_id: str,
     ingestion_ts: str,
 ) -> dict[str, object]:
@@ -297,6 +321,7 @@ def build_clean_record(
         "record_id": record.get("recordid"),
         "societe": record.get("identificationsociete_iso_nom_soc"),
         "isin": record.get("identificationsociete_iso_cd_isi"),
+        "ticker": ticker,
         "publication_ts": parse_api_datetime(record.get("uin_dat_amf")),
         "pdf_url": record.get("url_de_recuperation"),
         "titre": record.get("informationdeposee_inf_tit_inf"),
@@ -314,7 +339,7 @@ def extract_data(
     run_context: RunContext,
 ) -> ExtractionArtifacts:
     targets = load_targets(config.csv_path)
-    isins = sorted(targets)
+    isins = sorted(targets.keys())
 
     if not isins:
         raise ValueError("No valid ISIN found in the CSV.")
@@ -377,8 +402,11 @@ def extract_data(
                     raw_file.write(json.dumps(record, ensure_ascii=False) + "\n")
                     raw_count += 1
 
+                    ticker = targets[isin]
+
                     clean_record = build_clean_record(
                         record,
+                        ticker=ticker,
                         run_id=run_context.run_id,
                         ingestion_ts=ingestion_ts,
                     )
@@ -536,8 +564,15 @@ def ensure_dataset_exists(
 
 def ensure_table_exists(client: bigquery.Client, full_table_id: str) -> None:
     try:
-        client.get_table(full_table_id)
+        table = client.get_table(full_table_id)
         logger.info("Table OK: {}", full_table_id)
+
+        existing_fields = {field.name for field in table.schema}
+        if "ticker" not in existing_fields:
+            table.schema = list(table.schema) + [bigquery.SchemaField("ticker", "STRING")]
+            client.update_table(table, ["schema"])
+            logger.info("Column added to existing table: {}.ticker", full_table_id)
+
     except NotFound:
         table = bigquery.Table(full_table_id, schema=BQ_SCHEMA)
         table.time_partitioning = bigquery.TimePartitioning(
@@ -572,50 +607,6 @@ def gcs_to_bq(
     logger.info("Load job completed for {} into {}", gcs_uri, full_table_id)
 
 
-def merge_staging_into_target(
-    client: bigquery.Client,
-    staging_table_id: str,
-    target_table_id: str,
-) -> None:
-    query = f"""
-    MERGE `{target_table_id}` AS T
-    USING `{staging_table_id}` AS S
-    ON T.record_id = S.record_id
-
-    WHEN NOT MATCHED THEN
-      INSERT (
-        record_id,
-        societe,
-        isin,
-        publication_ts,
-        pdf_url,
-        titre,
-        sous_type,
-        type_information,
-        source,
-        run_id,
-        ingestion_ts
-      )
-      VALUES (
-        S.record_id,
-        S.societe,
-        S.isin,
-        S.publication_ts,
-        S.pdf_url,
-        S.titre,
-        S.sous_type,
-        S.type_information,
-        S.source,
-        S.run_id,
-        S.ingestion_ts
-      )
-    """
-
-    job = client.query(query)
-    job.result()
-    logger.info("MERGE completed from {} into {}", staging_table_id, target_table_id)
-
-
 def inject_bq(
     *,
     config: Config,
@@ -635,7 +626,6 @@ def inject_bq(
 
     logger.info("Using temp table: {}", temp_table_id)
 
-    # 1. load dans table temporaire
     gcs_to_bq(
         client=client,
         gcs_uri=gcs_artifacts.clean_uri,
@@ -644,7 +634,6 @@ def inject_bq(
         schema=BQ_SCHEMA,
     )
 
-    # 2. merge
     query = f"""
     MERGE `{config.full_table_id}` AS T
     USING `{temp_table_id}` AS S
@@ -654,6 +643,7 @@ def inject_bq(
       UPDATE SET
         T.societe = S.societe,
         T.isin = S.isin,
+        T.ticker = S.ticker,
         T.publication_ts = S.publication_ts,
         T.pdf_url = S.pdf_url,
         T.titre = S.titre,
@@ -668,6 +658,7 @@ def inject_bq(
         record_id,
         societe,
         isin,
+        ticker,
         publication_ts,
         pdf_url,
         titre,
@@ -681,6 +672,7 @@ def inject_bq(
         S.record_id,
         S.societe,
         S.isin,
+        S.ticker,
         S.publication_ts,
         S.pdf_url,
         S.titre,
@@ -695,7 +687,6 @@ def inject_bq(
     client.query(query).result()
     logger.info("MERGE completed")
 
-    # 3. cleanup
     client.delete_table(temp_table_id, not_found_ok=True)
     logger.info("Temp table deleted: {}", temp_table_id)
 

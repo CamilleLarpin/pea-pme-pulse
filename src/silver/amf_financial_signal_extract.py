@@ -129,7 +129,6 @@ FINANCIAL_SIGNAL_STAGING_SCHEMA: list[bigquery.SchemaField] = [
     bigquery.SchemaField("extracted_at", "TIMESTAMP"),
 ]
 
-
 # ============================================================================
 # Utilities
 # ============================================================================
@@ -147,17 +146,11 @@ def chunked(items: list[Any], size: int) -> list[list[Any]]:
     return [items[i : i + size] for i in range(0, len(items), size)]
 
 
-def build_ticker_from_source_url(source_url: str | None) -> str | None:
-    # Placeholder.
-    return None
-
-
 # ============================================================================
 # Financial text reduction
 # ============================================================================
 
 FINANCIAL_KEYWORDS = [
-    # Revenue / sales
     "chiffre d'affaires",
     "chiffre d affaires",
     "ca ",
@@ -167,7 +160,6 @@ FINANCIAL_KEYWORDS = [
     "revenues",
     "sales",
     "net sales",
-    # Profitability
     "ebitda",
     "ebit",
     "résultat opérationnel",
@@ -180,7 +172,6 @@ FINANCIAL_KEYWORDS = [
     "marge opérationnelle",
     "marge operationnelle",
     "marge op",
-    # Debt / cash
     "dette nette",
     "endettement net",
     "trésorerie nette",
@@ -196,7 +187,6 @@ FINANCIAL_KEYWORDS = [
     "flux de tresorerie disponible",
     "flux de trésorerie",
     "flux de tresorerie",
-    # Growth / percentages
     "croissance",
     "growth",
     "increase",
@@ -204,7 +194,6 @@ FINANCIAL_KEYWORDS = [
     "year-on-year",
     "yoy",
     "%",
-    # Dates / reporting periods
     "clos le",
     "exercice clos",
     "premier semestre clos",
@@ -221,7 +210,6 @@ FINANCIAL_KEYWORDS = [
     "half-year",
     "first half",
     "second half",
-    # Units / currencies
     "m€",
     "md€",
     "k€",
@@ -249,7 +237,6 @@ def score_financial_block(block: str) -> int:
     score = 0
 
     keyword_weights = {
-        # Revenue
         "chiffre d'affaires": 3,
         "chiffre d affaires": 3,
         "revenu": 2,
@@ -257,7 +244,6 @@ def score_financial_block(block: str) -> int:
         "revenue": 2,
         "sales": 2,
         "net sales": 2,
-        # Profitability
         "ebitda": 4,
         "ebit": 2,
         "résultat opérationnel": 3,
@@ -268,7 +254,6 @@ def score_financial_block(block: str) -> int:
         "marge operationnelle": 4,
         "marge op": 3,
         "operating margin": 4,
-        # Debt / cash
         "dette nette": 4,
         "endettement net": 4,
         "net debt": 4,
@@ -281,7 +266,6 @@ def score_financial_block(block: str) -> int:
         "flux de tresorerie disponible": 4,
         "flux de trésorerie": 2,
         "flux de tresorerie": 2,
-        # Dates
         "clos le": 3,
         "exercice clos": 3,
         "premier semestre clos": 3,
@@ -295,7 +279,6 @@ def score_financial_block(block: str) -> int:
         "half-year": 2,
         "first half": 2,
         "second half": 2,
-        # Growth / percentages
         "croissance": 2,
         "growth": 2,
         "year-on-year": 2,
@@ -353,7 +336,7 @@ def extract_financial_context(
     *,
     document_text: str,
     max_chars: int,
-    max_blocks: int = 8,
+    max_blocks: int = 15,
 ) -> str:
     blocks = split_text_into_blocks(document_text)
 
@@ -396,6 +379,7 @@ def extract_financial_context(
 class BronzeDocument:
     record_id: str
     isin: str | None
+    ticker: str | None
     pdf_gcs_uri: str
     source_url: str | None
     document_publication_ts: str | None
@@ -489,7 +473,13 @@ def fetch_bronze_documents(
     client: bigquery.Client,
     config: FinancialSignalConfig,
 ) -> list[BronzeDocument]:
-    limit_clause = f"\nLIMIT {config.max_documents}" if config.max_documents is not None else ""
+    # Validate interpolated values to prevent injection
+    recent_days = int(config.recent_days)
+    minimum_relevance_score = int(config.minimum_relevance_score)
+    if recent_days <= 0 or minimum_relevance_score < 0:
+        raise ValueError(f"Invalid config: recent_days={recent_days}, minimum_relevance_score={minimum_relevance_score}")
+
+    limit_clause = f"\nLIMIT {int(config.max_documents)}" if config.max_documents is not None else ""
 
     query = f"""
     WITH latest_run AS (
@@ -501,6 +491,7 @@ def fetch_bronze_documents(
       SELECT
         record_id,
         isin,
+        ticker,
         pdf_gcs_uri,
         pdf_url AS source_url,
         publication_ts AS document_publication_ts,
@@ -513,7 +504,10 @@ def fetch_bronze_documents(
       WHERE run_id = (SELECT run_id FROM latest_run)
         AND pdf_download_status = 'success'
         AND pdf_gcs_uri IS NOT NULL
-        AND publication_ts >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 90 DAY)
+        AND publication_ts >= TIMESTAMP_SUB(
+          CURRENT_TIMESTAMP(),
+          INTERVAL {recent_days} DAY
+        )
     ),
 
     scored AS (
@@ -521,7 +515,6 @@ def fetch_bronze_documents(
         *,
         (
           CASE
-            -- Strong annual signals
             WHEN REGEXP_CONTAINS(
               LOWER(COALESCE(titre, '')),
               r'résultat annuel|resultat annuel|annual results|full[- ]year results'
@@ -532,7 +525,6 @@ def fetch_bronze_documents(
               r'rapport financier annuel|annual financial report'
             ) THEN 5
 
-            -- Strong semi-annual signals
             WHEN REGEXP_CONTAINS(
               LOWER(COALESCE(titre, '')),
               r'résultat semestriel|resultat semestriel|half[- ]year results|half year results|interim results'
@@ -543,13 +535,11 @@ def fetch_bronze_documents(
               r'rapport financier semestriel|half[- ]year financial report|interim financial report'
             ) THEN 4
 
-            -- Revenue / sales signals
             WHEN REGEXP_CONTAINS(
               LOWER(COALESCE(titre, '')),
               r"chiffre d'affaires|chiffre d affaires|revenue|revenues|sales|net sales"
             ) THEN 4
 
-            -- Broader result/report signals
             WHEN REGEXP_CONTAINS(
               LOWER(COALESCE(titre, '')),
               r'résultat|resultat|results'
@@ -559,6 +549,11 @@ def fetch_bronze_documents(
               LOWER(COALESCE(titre, '')),
               r'rapport financier|financial report'
             ) THEN 3
+
+            WHEN REGEXP_CONTAINS(
+            LOWER(COALESCE(titre, '')),
+            r'mise à disposition|mise a disposition|publication du rapport|disponibilité du rapport|availability of'
+            ) THEN -4
 
             ELSE 0
           END
@@ -591,52 +586,81 @@ def fetch_bronze_documents(
           END
         ) AS relevance_score
       FROM base
+      WHERE (
+          CASE
+            WHEN REGEXP_CONTAINS(LOWER(COALESCE(titre, '')), r'résultat annuel|resultat annuel|annual results|full[- ]year results') THEN 5
+            WHEN REGEXP_CONTAINS(LOWER(COALESCE(titre, '')), r'rapport financier annuel|annual financial report') THEN 5
+            WHEN REGEXP_CONTAINS(LOWER(COALESCE(titre, '')), r'résultat semestriel|resultat semestriel|half[- ]year results|half year results|interim results') THEN 4
+            WHEN REGEXP_CONTAINS(LOWER(COALESCE(titre, '')), r'rapport financier semestriel|half[- ]year financial report|interim financial report') THEN 4
+            WHEN REGEXP_CONTAINS(LOWER(COALESCE(titre, '')), r"chiffre d'affaires|chiffre d affaires|revenue|revenues|sales|net sales") THEN 4
+            WHEN REGEXP_CONTAINS(LOWER(COALESCE(titre, '')), r'résultat|resultat|results') THEN 3
+            WHEN REGEXP_CONTAINS(LOWER(COALESCE(titre, '')), r'rapport financier|financial report') THEN 3
+            ELSE 0
+          END
+          +
+          CASE
+            WHEN REGEXP_CONTAINS(LOWER(COALESCE(sous_type, '')), r'annuel|annual|full[- ]year|fiscal year') THEN 2
+            WHEN REGEXP_CONTAINS(LOWER(COALESCE(sous_type, '')), r'semestriel|half[- ]year|half year|interim') THEN 1
+            WHEN REGEXP_CONTAINS(LOWER(COALESCE(sous_type, '')), r'résultat|resultat|results|revenue|sales') THEN 1
+            ELSE 0
+          END
+          +
+          CASE
+            WHEN REGEXP_CONTAINS(LOWER(COALESCE(type_information, '')), r'information réglementée|information reglementee|regulated information') THEN 1
+            ELSE 0
+          END
+        ) >= {minimum_relevance_score}
     )
 
     SELECT
-      record_id,
-      isin,
-      pdf_gcs_uri,
-      source_url,
-      document_publication_ts,
-      titre,
-      sous_type,
-      type_information,
-      source,
-      source_run_id
+      scored.record_id,
+      scored.isin,
+      scored.ticker,
+      scored.pdf_gcs_uri,
+      scored.source_url,
+      scored.document_publication_ts,
+      scored.titre,
+      scored.sous_type,
+      scored.type_information,
+      scored.source,
+      scored.source_run_id
     FROM scored
-    WHERE relevance_score >= 4
-      AND record_id NOT IN (
-        SELECT record_id
-        FROM `{config.full_work_table_id}`
-        WHERE extraction_status = 'success'
-      )
-    ORDER BY relevance_score DESC, document_publication_ts DESC NULLS LAST{limit_clause}
+    LEFT JOIN `{config.full_work_table_id}` work
+      ON scored.record_id = work.record_id
+      AND work.extraction_status IN ('success', 'no_financial_data')
+    WHERE work.record_id IS NULL
+    ORDER BY relevance_score DESC, document_publication_ts DESC{limit_clause}
     """
 
     rows = client.query(query).result()
 
-    documents = [
-        BronzeDocument(
+    documents = []
+    for row in rows:
+        try:
+            pub_ts = isoformat_utc(row["document_publication_ts"]) if row["document_publication_ts"] is not None else None
+        except Exception:
+            logger.warning("Could not parse publication_ts for record_id={}", row["record_id"])
+            pub_ts = None
+
+        documents.append(BronzeDocument(
             record_id=row["record_id"],
             isin=row["isin"],
+            ticker=row["ticker"],
             pdf_gcs_uri=row["pdf_gcs_uri"],
             source_url=row["source_url"],
-            document_publication_ts=isoformat_utc(row["document_publication_ts"])
-            if row["document_publication_ts"] is not None
-            else None,
+            document_publication_ts=pub_ts,
             titre=row["titre"],
             sous_type=row["sous_type"],
             type_information=row["type_information"],
             source=row["source"],
             source_run_id=row["source_run_id"],
-        )
-        for row in rows
-    ]
+        ))
 
     logger.info(
-        "Fetched {} bronze document(s) from latest run, last 90 days, relevance_score>=4 (FR+EN)",
+        "Fetched {} bronze document(s) from latest run, last {} days, relevance_score>={}",
         len(documents),
+        recent_days,
+        minimum_relevance_score,
     )
     return documents
 
@@ -720,104 +744,32 @@ def extract_text_with_pdfplumber(pdf_bytes: bytes) -> tuple[str, int]:
 
 
 def build_llm_messages(document_text: str) -> list[dict[str, str]]:
-    system_prompt = """
-You extract financial signals from listed-company financial documents.
+    system_prompt = """Extract financial signals from a financial document (French or English) and return ONLY valid JSON with exactly these keys (null if missing/uncertain):
 
-The document may be in French or English. You must extract values regardless of language.
+    date_cloture_exercice_raw, ca_raw, ca_growth_raw, ebitda_raw, marge_op_raw, dette_nette_raw, fcf_raw
 
-You must return ONLY one valid JSON object with exactly these keys:
-- date_cloture_exercice_raw
-- ca_raw
-- ca_growth_raw
-- ebitda_raw
-- marge_op_raw
-- dette_nette_raw
-- fcf_raw
+    DEFINITIONS:
+    - ca_raw: revenue/chiffre d'affaires/sales
+    - ca_growth_raw: revenue growth %
+    - ebitda_raw: EBITDA (not EBIT unless labeled EBITDA)
+    - marge_op_raw: operating margin/marge opérationnelle
+    - dette_nette_raw: net debt/dette nette
+    - fcf_raw: free cash flow
 
-STRICT OUTPUT RULES:
-1. Output must be valid JSON only.
-2. Do not add explanations.
-3. Do not add markdown.
-4. Do not add any extra keys.
-5. If a value is missing or uncertain, return null.
+    UNIT INFERENCE RULE:
+    - When values come from a table, always look for the unit header of that table
+    (e.g. "in K€", "in thousands of euros", "€ million", "in €k").
+    - Apply that unit to all values extracted from that table.
+    - Never return a raw number without a unit — if the unit is ambiguous, return null.
+    
+    FORMAT RULES:
+    - Monetary: "<number> EUR|thousand EUR|million EUR|billion EUR" — dot as decimal, no commas, no €, no spaces in number
+    - Percentage: "<number>%" — dot as decimal (e.g. "7.2%", "-3.5%")
+    - Date: ISO "YYYY-MM-DD" — look for "clos le / au / exercice clos / year ended / as of / period ended". Null if day unknown.
+    - If unit is missing or ambiguous → null
 
-NORMALIZATION RULES:
-- Monetary values must ALWAYS be returned in one of these exact formats:
-  - "<number> EUR"
-  - "<number> thousand EUR"
-  - "<number> million EUR"
-  - "<number> billion EUR"
-
-- The number must:
-  - use dot as decimal separator
-  - never use comma
-  - never include spaces as thousands separators
-  - never include currency symbols like €, EUR€ or words like "euros"
-
-VALID examples:
-- "756.7 million EUR"
-- "1.2 billion EUR"
-- "250000 EUR"
-- "22.9 million EUR"
-
-INVALID examples:
-- "756,7 M€"
-- "2,6 millions d’euros"
-- "22,9"
-- "0,7"
-- "€756.7m"
-
-PERCENTAGE RULES:
-- Percentages must ALWAYS be returned as "<number>%"
-- The number must use dot as decimal separator.
-
-VALID examples:
-- "7.2%"
-- "12%"
-- "-3.5%"
-
-INVALID examples:
-- "7,2 %"
-- "7.2 percent"
-- "0.072"
-
-DATE RULES:
-- date_cloture_exercice_raw must be returned in ISO format: "YYYY-MM-DD" whenever possible.
-- Look carefully for phrases like:
-  - "clos le"
-  - "au"
-  - "au 31 décembre"
-  - "au 31 decembre"
-  - "premier semestre clos le"
-  - "exercice clos le"
-  - "for the year ended"
-  - "for the period ended"
-  - "as of"
-  - "ended"
-- Prefer the reporting period end date corresponding to the extracted financial values.
-- If only a month/year or year is visible and the exact day is not explicit, return null.
-
-SELECTION RULES:
-- Search the full text carefully before returning null.
-- Prefer explicit KPI summary sections, highlights, tables, or bullet lists.
-- If multiple values are present, choose the most recent reporting period described in the text.
-- Prefer annual or semi-annual consolidated values over quarterly values when possible.
-- Prefer values explicitly labeled with the metric name.
-- If a metric appears several times, choose the value associated with the most recent reporting period.
-
-METRIC DEFINITIONS:
-- ca_raw = revenue / chiffre d'affaires / sales / net sales
-- ca_growth_raw = growth of revenue / chiffre d'affaires / sales growth
-- ebitda_raw = EBITDA only, not EBIT unless explicitly labeled EBITDA
-- marge_op_raw = operating margin / marge opérationnelle
-- dette_nette_raw = net debt / dette nette / endettement net
-- fcf_raw = free cash flow / flux de trésorerie disponible
-
-IMPORTANT:
-- Before returning null for EBITDA, net debt, FCF, or operating margin, verify whether the value appears in a summary table, highlights section, or bullet list.
-- Before answering, verify that every monetary value includes an explicit unit.
-- If a unit is missing or ambiguous, return null for that field.
-""".strip()
+    SELECTION: Use most recent reporting period. Prefer annual/semi-annual consolidated values. Check summary tables, highlights, and bullet lists before returning null. No markdown, no explanation, no extra keys.
+    """.strip()
 
     user_prompt = f"""
 Extract the requested financial signals from the following financial document text.
@@ -910,7 +862,9 @@ def call_groq_llama(
                 else None
             )
             reset_requests = (
-                response.headers.get("x-ratelimit-reset-requests") if response is not None else None
+                response.headers.get("x-ratelimit-reset-requests")
+                if response is not None
+                else None
             )
 
             if status_code == 429:
@@ -1007,7 +961,7 @@ def process_document(
     financial_signal_run_id: str,
 ) -> FinancialSignalRow:
     extracted_at = isoformat_utc(utc_now())
-    ticker = build_ticker_from_source_url(document.source_url)
+    ticker = document.ticker
 
     try:
         pdf_bytes = download_pdf_bytes_from_gcs(
@@ -1052,6 +1006,7 @@ def process_document(
             document_text=document_text,
             max_chars=config.financial_context_max_chars,
         )
+        
 
         logger.info(
             "Financial context prepared | record_id={} | text_length={} | context_length={}",
@@ -1076,6 +1031,38 @@ def process_document(
         )
         llm_data = parse_llm_json(raw_llm_response)
 
+        # Filter out documents with no financial data
+        FINANCIAL_FIELDS = ["ca_raw", "ebitda_raw", "marge_op_raw", "dette_nette_raw", "fcf_raw"]
+        if all(llm_data.get(f) is None for f in FINANCIAL_FIELDS):
+            return FinancialSignalRow(
+                record_id=document.record_id,
+                isin=document.isin,
+                ticker=ticker,
+                source_url=document.source_url,
+                pdf_gcs_uri=document.pdf_gcs_uri,
+                document_publication_ts=document.document_publication_ts,
+                date_cloture_exercice_raw=None,
+                ca_raw=None,
+                ca_growth_raw=None,
+                ebitda_raw=None,
+                marge_op_raw=None,
+                dette_nette_raw=None,
+                fcf_raw=None,
+                document_text_excerpt=financial_context[: config.text_excerpt_max_chars],
+                text_length=text_length,
+                page_count=page_count,
+                parser_used="pdfplumber",
+                llm_model=config.groq_model,
+                llm_prompt_version=config.llm_prompt_version,
+                extraction_status="no_financial_data",
+                error_message="All financial fields are null.",
+                raw_llm_response=raw_llm_response,
+                source=document.source,
+                source_run_id=document.source_run_id,
+                financial_signal_run_id=financial_signal_run_id,
+                extracted_at=extracted_at,
+            )
+                
         return FinancialSignalRow(
             record_id=document.record_id,
             isin=document.isin,
