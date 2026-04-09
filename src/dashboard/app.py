@@ -316,7 +316,9 @@ def main() -> None:
     render_sidebar()
 
     st.title("📈 PEA-PME Pulse — Tableau de bord")
-    st.caption("Scoring technique quotidien · Données BigQuery · Mise à jour chaque soir en semaine")
+    st.caption(
+        "Scoring technique quotidien · Données BigQuery · Mise à jour chaque soir en semaine"
+    )
 
     with st.spinner("Chargement des données..."):
         df = load_latest_scores()
