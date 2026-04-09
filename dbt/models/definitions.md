@@ -148,7 +148,7 @@ Technical signal derived from MACD vs MACD_signal line. Scoring: MACD > MACD_sig
 {% enddocs %}
 
 {% docs golden_cross_signal %}
-Technical signal based on the SMA_50 / SMA_200 relationship. Scoring: SMA_50 > SMA_200 (golden cross — long-term bullish regime) → 2.0; SMA_50 ≤ SMA_200 (death cross or equal — bearish) → 0.0; either SMA NULL (warmup < 200 bars) → 1.0 (neutral).
+Technical signal based on the SMA_50 / SMA_200 relationship (SMA regime detection, not an event-based crossover). Scoring: SMA_50 > SMA_200 (bullish SMA regime — traditionally associated with a golden cross setup) → 2.0; SMA_50 ≤ SMA_200 (bearish regime — death cross territory) → 0.0; either SMA NULL (warmup < 200 bars) → 1.0 (neutral). Note: the signal stays at +2 as long as SMA_50 remains above SMA_200, not only on the day of the crossing. This is deliberate — for daily scoring, a sustained bullish regime is more informative than the single crossing event.
 {% enddocs %}
 
 {% docs bollinger_signal %}
