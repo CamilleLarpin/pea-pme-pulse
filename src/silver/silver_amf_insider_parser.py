@@ -1,22 +1,23 @@
-import os
-import sys
-from dotenv import load_dotenv
-from google.cloud import bigquery
-from groq import Groq
-import pdfplumber
-from prefect import client
-from pathlib import Path
-import requests
 import io
 import json
-from datetime import datetime
-import time
-from loguru import logger
+import os
 import re
+import sys
+import time
+from datetime import datetime
+from pathlib import Path
+
+import pdfplumber
+import requests
+from google.cloud import bigquery
+from google.cloud.exceptions import NotFound
+from groq import Groq
+from loguru import logger
 
 # Configuration for BigQuery and Groq
 GCP_PREFIX_INPUT_TABLE_ID = "amf"
 GCP_PREFIX_OUTPUT_TABLE_ID = "amf_insider_signals"
+
 
 def load_and_log_environment():
     """
@@ -45,7 +46,7 @@ def load_and_log_environment():
         "BQ_DATASET_BRONZE": os.getenv("BQ_DATASET_BRONZE"),
         "BQ_DATASET_SILVER": os.getenv("BQ_DATASET_SILVER"),
         "GROQ_API_KEY": os.getenv("GROQ_API_KEY"),
-        "GEMINI_API_KEY": os.getenv("GEMINI_API_KEY")
+        "GEMINI_API_KEY": os.getenv("GEMINI_API_KEY"),
     }
 
     logger.info("--- Environment Configuration Check ---")
@@ -64,6 +65,7 @@ def load_and_log_environment():
     # Return the dictionary to the caller for further use in the pipeline
     return config
 
+
 def load_from_bigquery(project_id, dataset_id, table_id):
     """
     Load documents for processing from the input layer (Bronze/Silver).
@@ -76,17 +78,19 @@ def load_from_bigquery(project_id, dataset_id, table_id):
         table_id (str): The destination table name.
 
     Returns:
-        list[dict]: A list of dictionaries containing record details, 
+        list[dict]: A list of dictionaries containing record details,
                    or an empty list if no records are found or an error occurs.
     """
     client = bigquery.Client(project=project_id)
     table_path = f"{project_id}.{dataset_id}.{table_id}"
-    
+
     logger.info(f"📊 Fetching documents from: {table_path}")
 
     # SQL Query: Filters for confirmed 'success' downloads and valid insider signals
     if dataset_id == "bronze":
-        logger.info("Applying Bronze layer filters: Only 'success' downloads with insider-related titles from the last 90 days.")
+        logger.info(
+            "Applying Bronze layer filters: Only 'success' downloads with insider-related titles from the last 90 days."
+        )
         query = f"""
             SELECT 
                 record_id, 
@@ -112,7 +116,9 @@ def load_from_bigquery(project_id, dataset_id, table_id):
             LIMIT 12
             """
     elif dataset_id == "silver":
-        logger.info("Applying Silver layer filters: Only 'success' downloads with insider-related titles from the last 90 days, excluding already processed records.")
+        logger.info(
+            "Applying Silver layer filters: Only 'success' downloads with insider-related titles from the last 90 days, excluding already processed records."
+        )
         query = f"SELECT DISTINCT source_record_id FROM `{table_path}`"
 
     try:
@@ -120,7 +126,9 @@ def load_from_bigquery(project_id, dataset_id, table_id):
         # Convert BigQuery RowIterator directly into a list of dictionaries
         pdf_list = [dict(row) for row in query_job.result()]
         if len(pdf_list) > 0:
-            logger.success(f"✅ Successfully retrieved {len(pdf_list)} valid records for PDF analysis.")
+            logger.success(
+                f"✅ Successfully retrieved {len(pdf_list)} valid records for PDF analysis."
+            )
             return pdf_list
         else:
             logger.warning("⚠️ No valid records found for PDF analysis.")
@@ -129,7 +137,8 @@ def load_from_bigquery(project_id, dataset_id, table_id):
     except Exception as e:
         logger.warning(f"❌ Error during BigQuery data extraction: {e}")
         return []
-    
+
+
 def extract_text_from_pdf(url):
     """
     Downloads the PDF and returns the contained text.
@@ -138,13 +147,13 @@ def extract_text_from_pdf(url):
         url (str): The public URL of the PDF document to be processed.
 
     Returns:
-        str: The full text extracted from the PDF, or None if the download 
+        str: The full text extracted from the PDF, or None if the download
              or parsing fails.
     """
     try:
         response = requests.get(url, timeout=10)
-        response.raise_for_status() # Ensure the download was successful
-        
+        response.raise_for_status()  # Ensure the download was successful
+
         # Use BytesIO to read the PDF directly from memory
         with pdfplumber.open(io.BytesIO(response.content)) as pdf:
             full_text = ""
@@ -152,12 +161,13 @@ def extract_text_from_pdf(url):
                 page_text = page.extract_text()
                 if page_text:
                     full_text += page_text + "\n"
-            
+
             return full_text.strip()
-            
+
     except Exception as e:
         print(f"❌ Error during download/parsing of PDF {url}: {e}")
         return None
+
 
 def parse_insider_data(text, doc_info):
     """
@@ -177,12 +187,12 @@ def parse_insider_data(text, doc_info):
 
     # 1. TEXT TRUNCATION
     # 3000 chars is sufficient for the main tables in Novacyt/Ubisoft docs
-    clean_text = re.sub(r'\s+', ' ', text)[:3000] 
+    clean_text = re.sub(r"\s+", " ", text)[:3000]
 
     # 2. ENHANCED MULTI-SIGNAL PROMPT
     # Specifically asking for a list to handle multiple directors in one PDF
     context_prompt = f"""
-    Extract ALL insider trading transactions for the company {doc_info['societe']} from the text.
+    Extract ALL insider trading transactions for the company {doc_info["societe"]} from the text.
     The document may contain multiple transactions for different directors.
 
     RETURN A JSON OBJECT WITH A KEY "signals" CONTAINING A LIST OF TRANSACTIONS.
@@ -203,23 +213,26 @@ def parse_insider_data(text, doc_info):
     """
 
     # 3. PREVENTIVE DELAY (Rate Limit Protection)
-    time.sleep(12) 
+    time.sleep(12)
 
     try:
         # Groq client initialization using environment API key
         client_groq = Groq(api_key=env["GROQ_API_KEY"])
-        
+
         completion = client_groq.chat.completions.create(
             model="llama-3.1-8b-instant",
             messages=[
-                {"role": "system", "content": "You are a financial analyst. You output ONLY valid JSON. If multiple directors are present, extract each one."},
-                {"role": "user", "content": context_prompt + "\n\nTEXT:\n" + clean_text}
+                {
+                    "role": "system",
+                    "content": "You are a financial analyst. You output ONLY valid JSON. If multiple directors are present, extract each one.",
+                },
+                {"role": "user", "content": context_prompt + "\n\nTEXT:\n" + clean_text},
             ],
-            response_format={"type": "json_object"}
+            response_format={"type": "json_object"},
         )
-        
+
         raw_output = json.loads(completion.choices[0].message.content)
-        
+
         # 4. ROBUST MULTI-SIGNAL HANDLING
         # Extract signals regardless of JSON structure variations (list vs object)
         raw_signals = []
@@ -228,12 +241,13 @@ def parse_insider_data(text, doc_info):
         elif isinstance(raw_output, list):
             raw_signals = raw_output
         else:
-            raw_signals = [raw_output] # Single object fallback
+            raw_signals = [raw_output]  # Single object fallback
 
         processed_signals = []
 
         for data in raw_signals:
-            if not isinstance(data, dict): continue
+            if not isinstance(data, dict):
+                continue
 
             # 5. FINAL SCHEMA ENFORCEMENT & CALCULATIONS
             final_signal = {
@@ -243,8 +257,8 @@ def parse_insider_data(text, doc_info):
                 "qualite": str(data.get("qualite", "Unknown")),
                 "type_operation": str(data.get("type_operation", "Unknown")),
                 "montant": 0.0,
-                "source_record_id": doc_info.get('record_id'), # Link back to Bronze layer
-                "url_doc": doc_info.get('pdf_url', '')
+                "source_record_id": doc_info.get("record_id"),  # Link back to Bronze layer
+                "url_doc": doc_info.get("pdf_url", ""),
             }
 
             # Safe Float Conversion & Calculation for 'montant' (amount)
@@ -252,25 +266,28 @@ def parse_insider_data(text, doc_info):
                 m = data.get("montant")
                 # If montant is 0 or missing, try to calculate from quantity * price
                 if not m or m == 0:
-                    qty = float(str(data.get("nombre_actions", 0)).replace(' ', '').replace(',', ''))
-                    px = float(str(data.get("prix_moyen", 0)).replace('€', '').replace(',', '.'))
+                    qty = float(
+                        str(data.get("nombre_actions", 0)).replace(" ", "").replace(",", "")
+                    )
+                    px = float(str(data.get("prix_moyen", 0)).replace("€", "").replace(",", "."))
                     m = qty * px
-                
+
                 if isinstance(m, str):
-                    m = m.replace('€', '').replace(' ', '').replace(',', '.')
-                
+                    m = m.replace("€", "").replace(" ", "").replace(",", ".")
+
                 final_signal["montant"] = float(m)
-            except (Exception):
+            except Exception:
                 final_signal["montant"] = 0.0
 
             # Convert each signal back to JSON string for the payload list
             processed_signals.append(json.dumps(final_signal))
 
-        return processed_signals # Returns a LIST of strings
+        return processed_signals  # Returns a LIST of strings
 
     except Exception as e:
         logger.error(f"❌ Error during parsing for {doc_info['societe']}: {e}")
         return None
+
 
 def is_valid_insider(dirigeant, type_op, date_signal):
     """
@@ -286,7 +303,7 @@ def is_valid_insider(dirigeant, type_op, date_signal):
     """
     if not dirigeant or not type_op:
         return False
-    
+
     name = str(dirigeant).strip()
     name_lower = name.lower()
     name_parts = name_lower.split()
@@ -299,10 +316,17 @@ def is_valid_insider(dirigeant, type_op, date_signal):
     # 2. DESCRIPTIVE WORD BLACKLIST
     # If the "name" contains any of these words, it is likely a description, not a person
     forbidden_words = {
-        "ancien", "dirigeant", "membre", "société", "groupe", 
-        "direction", "representant", "permanent", "fondation"
+        "ancien",
+        "dirigeant",
+        "membre",
+        "société",
+        "groupe",
+        "direction",
+        "representant",
+        "permanent",
+        "fondation",
     }
-    
+
     # Check if at least one word in the name is in the blacklist
     if any(word in forbidden_words for word in name_parts):
         return False
@@ -314,27 +338,29 @@ def is_valid_insider(dirigeant, type_op, date_signal):
 
     # 4. Date filter (Discard signals without a valid date)
     date_str = str(date_signal).lower() if date_signal else "none"
-    
+
     try:
         from datetime import datetime
+
         # Attempt to convert the string into a datetime object
         # If date_str is "2026-03-26", it transforms it into a manipulatable object
-        dt_obj = datetime.strptime(date_str, '%Y-%m-%d')
-        
+        dt_obj = datetime.strptime(date_str, "%Y-%m-%d")
+
         # If the date is prior to 2025, discard the signal
         if dt_obj.year < 2025:
             return False
     except (ValueError, TypeError):
-        # If the date is not in the correct format or is "unknown"/"none", 
+        # If the date is not in the correct format or is "unknown"/"none",
         # the try block fails and the record is discarded
         return False
-    
+
     return not ("inconnue" in date_str or date_str == "none")
+
 
 def upload_full_json_to_bigquery(rows, project_id, dataset_id, table_id):
     """
     Standardized protocol to upload a list of records to a specific BigQuery table.
-    
+
     Args:
         rows (list[dict]): A list of dictionaries representing the records to insert.
         project_id (str): The Google Cloud Project ID.
@@ -363,7 +389,7 @@ def upload_full_json_to_bigquery(rows, project_id, dataset_id, table_id):
         autodetect=True,  # Automatically detects schema from JSON fields
         source_format=bigquery.SourceFormat.NEWLINE_DELIMITED_JSON,
         write_disposition="WRITE_APPEND",  # Appends new data to the existing table
-        schema_update_options=[bigquery.SchemaUpdateOption.ALLOW_FIELD_ADDITION]
+        schema_update_options=[bigquery.SchemaUpdateOption.ALLOW_FIELD_ADDITION],
     )
 
     if not rows:
@@ -375,24 +401,21 @@ def upload_full_json_to_bigquery(rows, project_id, dataset_id, table_id):
 
     try:
         logger.info(f"🚀 Uploading {len(rows)} rows to {dataset_id}.{table_id}...")
-        
+
         # Start the Load Job
-        load_job = client.load_table_from_json(
-            rows, 
-            table_ref, 
-            job_config=job_config
-        )
-        
+        load_job = client.load_table_from_json(rows, table_ref, job_config=job_config)
+
         # Wait for the job to complete (synchronous block)
         result = load_job.result()
-        
+
         logger.success(
             f"✅ Success: {result.output_rows} rows appended to "
             f"'{project_id}.{dataset_id}.{table_id}'."
         )
-        
+
     except Exception as e:
         logger.error(f"❌ Critical error uploading to table '{table_id}': {e}")
+
 
 def extract_insider_signals(all_documents):
     """
@@ -400,32 +423,34 @@ def extract_insider_signals(all_documents):
     Handles multiple signals per document (e.g., cases with multiple directors).
 
     Args:
-        all_documents (list[dict]): A list of document metadata dictionaries 
+        all_documents (list[dict]): A list of document metadata dictionaries
                                     (including 'societe', 'pdf_url', 'isin', and 'record_id').
 
     Returns:
-        list[dict]: A list of enriched and validated signal dictionaries ready 
+        list[dict]: A list of enriched and validated signal dictionaries ready
                     for database insertion.
     """
     final_payload = []
-    
-    for doc in all_documents: 
+
+    for doc in all_documents:
         logger.info(f"Starting analysis for: {doc['societe']}")
-        
+
         # 1. Text Extraction
-        text = extract_text_from_pdf(doc['pdf_url'])
-        
+        text = extract_text_from_pdf(doc["pdf_url"])
+
         if not text:
             logger.warning(f"Empty text for {doc['societe']}. Skipping.")
             continue
 
         logger.info(f"Text extracted ({len(text)} chars). Calling AI...")
-        
+
         # 2. AI Extraction (Groq/Llama)
         result_json_list = parse_insider_data(text, doc)
-        
+
         if result_json_list is None:
-            logger.critical("🛑 Groq API limit reached or error occurred. Stopping pipeline to avoid unnecessary loops.")
+            logger.critical(
+                "🛑 Groq API limit reached or error occurred. Stopping pipeline to avoid unnecessary loops."
+            )
             break
 
         if isinstance(result_json_list, list):
@@ -433,41 +458,43 @@ def extract_insider_signals(all_documents):
                 try:
                     # Decode the JSON string extracted by the AI
                     signal = json.loads(signal_json_str)
-                    
+
                     # --- 1. DATA EXTRACTION AND VALIDATION ---
                     dirigeant_value = signal.get("dirigeant")
                     type_op_value = signal.get("type_operation", "")
-                    date_value = signal.get('date_signal')
-                    
+                    date_value = signal.get("date_signal")
+
                     # Validate the individual signal to filter out noise or formatting errors
                     if not is_valid_insider(dirigeant_value, type_op_value, date_value):
                         logger.warning(f"⚠️ Discarded: {dirigeant_value} | Op: {type_op_value}")
                         continue
-        
+
                     # --- 2. ENRICHMENT AND SAFETY OVERRIDE ---
                     # Use verified data from the Bronze layer to prevent AI hallucinations
-                    signal['societe'] = doc.get('societe', 'Unknown')
-                    signal['isin'] = doc.get('isin', 'Unknown')
-                    signal['source_record_id'] = doc.get('record_id')
-                    
+                    signal["societe"] = doc.get("societe", "Unknown")
+                    signal["isin"] = doc.get("isin", "Unknown")
+                    signal["source_record_id"] = doc.get("record_id")
+
                     # Traceability metadata
-                    signal['processed_at'] = datetime.now().isoformat()
-                    signal['extraction_method'] = "groq-llama-3.1-8b-instant" 
-                    
+                    signal["processed_at"] = datetime.now().isoformat()
+                    signal["extraction_method"] = "groq-llama-3.1-8b-instant"
+
                     # Fallback for the ticker if not found by AI
-                    if not signal.get('ticker') or signal.get('ticker') == "Unknown":
-                        signal['ticker'] = doc.get('isin', 'Unknown')
+                    if not signal.get("ticker") or signal.get("ticker") == "Unknown":
+                        signal["ticker"] = doc.get("isin", "Unknown")
 
                     # Add to the final payload
                     final_payload.append(signal)
                     logger.success(f"✅ Signal identified: {dirigeant_value} ({doc['societe']})")
-                        
+
                 except json.JSONDecodeError as e:
                     logger.error(f"Failed to decode JSON signal for {doc['societe']}: {e}")
                 except Exception as e:
                     logger.error(f"Error during signal enrichment for {doc['societe']}: {e}")
         else:
-            logger.warning(f"Expected a list of signals from parse_insider_data, but got {type(result_json_list)}")
+            logger.warning(
+                f"Expected a list of signals from parse_insider_data, but got {type(result_json_list)}"
+            )
 
     # Courtesy pause between processing documents to manage load
     time.sleep(1)
@@ -495,15 +522,15 @@ def filter_insider_text(text):
 """
 
 
-
 # ---------------------------------------------------------------------------
 # Orchestration
 # ---------------------------------------------------------------------------
 
+
 def run() -> None:
     """
     Main orchestration function for the AMF Insider Trading pipeline.
-    
+
     Main steps:
         Load pending records from the Bronze layer (BigQuery).
         Load existing records from the Silver layer to check for duplicates.
@@ -516,53 +543,65 @@ def run() -> None:
     """
     try:
         # Data Loading from BigQuery: fetch records from the Bronze layer using our global table constant
-        pending_docs = load_from_bigquery(env["GCP_PROJECT_ID"], env["BQ_DATASET_BRONZE"], GCP_PREFIX_INPUT_TABLE_ID)      
+        pending_docs = load_from_bigquery(
+            env["GCP_PROJECT_ID"], env["BQ_DATASET_BRONZE"], GCP_PREFIX_INPUT_TABLE_ID
+        )
         if not pending_docs:
             logger.info("No documents found to process. Exiting pipeline.")
             return
         else:
-            logger.success(f"✅ Successfully retrieved {len(pending_docs)} valid records for PDF analysis.")
-     
+            logger.success(
+                f"✅ Successfully retrieved {len(pending_docs)} valid records for PDF analysis."
+            )
+
         # Duplicate Check: retrieve successfully processed records from the Silver layer
         # Ensure the Silver query selects the 'source_record_id' column
-        current_docs = load_from_bigquery(env["GCP_PROJECT_ID"], env["BQ_DATASET_SILVER"], GCP_PREFIX_OUTPUT_TABLE_ID)
+        current_docs = load_from_bigquery(
+            env["GCP_PROJECT_ID"], env["BQ_DATASET_SILVER"], GCP_PREFIX_OUTPUT_TABLE_ID
+        )
         if not current_docs:
             logger.info("Silver table is currently empty. All pending documents will be processed.")
         else:
-            logger.success(f"✅ Retrieved {len(current_docs)} records from Silver layer for comparison.")
-        
+            logger.success(
+                f"✅ Retrieved {len(current_docs)} records from Silver layer for comparison."
+            )
+
         # Create a set of already processed record IDs for O(1) lookups
-        already_done_ids = {doc['source_record_id'] for doc in current_docs if 'source_record_id' in doc}
-        
-        # Filtering Logic: identify pending documents have not yet been processed 
+        already_done_ids = {
+            doc["source_record_id"] for doc in current_docs if "source_record_id" in doc
+        }
+
+        # Filtering Logic: identify pending documents have not yet been processed
         # by checking their record_id against the Silver layer IDs
         docs_to_process = []
         for doc in pending_docs:
             # Verify that the key exists to prevent critical failure during lookup
-            if 'record_id' in doc:
-                if doc['record_id'] not in already_done_ids:
+            if "record_id" in doc:
+                if doc["record_id"] not in already_done_ids:
                     docs_to_process.append(doc)
             else:
                 logger.warning(f"Document record_id missing: {doc}")
 
-        logger.info(f"📊 Stats: {len(pending_docs)} found in Bronze, {len(already_done_ids)} already in Silver.")
+        logger.info(
+            f"📊 Stats: {len(pending_docs)} found in Bronze, {len(already_done_ids)} already in Silver."
+        )
         logger.success(f"🚀 To process: {len(docs_to_process)} new documents.")
-        
+
         # AI Extraction: trigger the Groq/Llama extraction only on the filtered list of documents
         if docs_to_process:
             logger.info(f"📊 Starting AI extraction on {len(docs_to_process)} new documents...")
             final_payload = extract_insider_signals(docs_to_process)
-        
+
             # PHASE 5: Save to BigQuery (Silver Layer)
             if final_payload:
                 logger.info(f"Uploading {len(final_payload)} signals to Silver layer...")
-                
+
                 # Uploading the rows using the standardized BigQuery helper
                 upload_full_json_to_bigquery(
                     rows=final_payload,
-                    project_id=env["GCP_PROJECT_ID"], 
+                    project_id=env["GCP_PROJECT_ID"],
                     dataset_id=env["BQ_DATASET_SILVER"],
-                    table_id=GCP_PREFIX_OUTPUT_TABLE_ID # Global constant for 'amf_insider_parser'
+                    table_id=GCP_PREFIX_OUTPUT_TABLE_ID,  # Global constant for 'amf_insider_parser'
                 )
             else:
                 logger.info("No valid insider signals found in this batch.")
@@ -570,10 +609,11 @@ def run() -> None:
     except Exception as e:
         # Global exception handler to prevent silent failures in the workflow
         logger.critical(f"Critical failure in processing pipeline: {e}")
-        
+
+
 # Load environment variables (API keys, Project IDs, etc.)
 env = load_and_log_environment()
-    
+
 if __name__ == "__main__":
     """
     Entry point for the AMF Insider Parser pipeline.

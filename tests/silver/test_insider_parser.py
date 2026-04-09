@@ -1,14 +1,13 @@
-import os
 import json
+import os
 from pathlib import Path
-from loguru import logger
+
 from dotenv import load_dotenv
+from loguru import logger
 
 # Import the core logic functions from your silver module
-from silver.silver_amf_insider_parser import (
-    is_valid_insider, 
-    parse_insider_data
-)
+from silver.silver_amf_insider_parser import is_valid_insider, parse_insider_data
+
 
 def load_and_log_environment():
     """
@@ -33,7 +32,7 @@ def load_and_log_environment():
         "BQ_DATASET_BRONZE": os.getenv("BQ_DATASET_BRONZE"),
         "BQ_DATASET_SILVER": os.getenv("BQ_DATASET_SILVER"),
         "GROQ_API_KEY": os.getenv("GROQ_API_KEY"),
-        "GEMINI_API_KEY": os.getenv("GEMINI_API_KEY")
+        "GEMINI_API_KEY": os.getenv("GEMINI_API_KEY"),
     }
 
     logger.info("--- Test Environment Configuration Check ---")
@@ -46,8 +45,10 @@ def load_and_log_environment():
 
     return config
 
+
 # Global environment variable for the module
 env = load_and_log_environment()
+
 
 def test_basic_flow():
     """
@@ -63,7 +64,7 @@ def test_basic_flow():
     mock_doc_info = {
         "record_id": "amf_2026_test_001",
         "societe": "UBISOFT ENTERTAINMENT",
-        "isin": "FR0000054470"
+        "isin": "FR0000054470",
     }
 
     mock_pdf_text = """
@@ -76,7 +77,7 @@ def test_basic_flow():
     """
 
     # AI Parsing Execution
-    # We pass the env dictionary if your function requires it, 
+    # We pass the env dictionary if your function requires it,
     # otherwise it uses the one in its own module.
     logger.info("Sending data to AI for parsing...")
     extracted_signals = parse_insider_data(mock_pdf_text, mock_doc_info)
@@ -90,13 +91,14 @@ def test_basic_flow():
     for signal_str in extracted_signals:
         try:
             signal = json.loads(signal_str)
-            
+
             # Use the imported validation function
-            if is_valid_insider(signal.get("dirigeant"), signal.get("type_operation"), signal.get("date_signal")):
-                signal.update({
-                    "isin": mock_doc_info["isin"],
-                    "processed_at": "2026-04-09T10:00:00"
-                })
+            if is_valid_insider(
+                signal.get("dirigeant"), signal.get("type_operation"), signal.get("date_signal")
+            ):
+                signal.update(
+                    {"isin": mock_doc_info["isin"], "processed_at": "2026-04-09T10:00:00"}
+                )
                 final_payload.append(signal)
                 logger.success(f"VALIDATED: {signal.get('dirigeant')} | {signal.get('montant')}€")
             else:
@@ -105,6 +107,7 @@ def test_basic_flow():
             logger.error(f"Error parsing signal JSON: {e}")
 
     logger.info(f"\n--- [RESULTS] Successfully processed {len(final_payload)} signals ---")
+
 
 if __name__ == "__main__":
     try:

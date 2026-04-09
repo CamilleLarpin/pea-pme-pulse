@@ -52,9 +52,12 @@ def _run_dbt(select: str) -> None:
     profiles = _build_profiles(method, keyfile)
 
     cmd = [
-        "dbt", "run",
-        "--select", select,
-        "--project-dir", str(DBT_PROJECT_DIR),
+        "dbt",
+        "run",
+        "--select",
+        select,
+        "--project-dir",
+        str(DBT_PROJECT_DIR),
     ]
 
     with tempfile.TemporaryDirectory() as profiles_dir:
