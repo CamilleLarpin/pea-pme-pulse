@@ -6,7 +6,6 @@ Orchestrates the three layer flows as subflows in sequence.
 
 from __future__ import annotations
 
-import subprocess
 import sys
 from pathlib import Path
 
@@ -16,35 +15,16 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from flows.bronze_amf_flux import amf_flux_flow
 from flows.silver_amf import amf_financial_signal_silver_flow
+from flows.utils.dbt import _base_dbt_cmd, _dbt_deps, _log_dbt_output, _run_dbt
 
 DBT_PROJECT_DIR = Path(__file__).parent.parent.parent / "dbt"
-
-
-def _run_dbt(cmd: list[str]) -> subprocess.CompletedProcess:
-    return subprocess.run(cmd, capture_output=True, text=True)
-
-
-def _log_dbt_output(logger, result: subprocess.CompletedProcess) -> None:
-    if result.stdout:
-        logger.info(f"dbt stdout:\n{result.stdout}")
-    if result.stderr:
-        logger.warning(f"dbt stderr:\n{result.stderr}")
-
-
-def _base_dbt_cmd(subcommand: str, select: str) -> list[str]:
-    return [
-        "dbt",
-        subcommand,
-        "--select",
-        select,
-        "--project-dir",
-        str(DBT_PROJECT_DIR),
-    ]
 
 
 @task(name="dbt-run-financials-score", retries=1, retry_delay_seconds=30)
 def dbt_run_financials_score_task(full_refresh: bool = False) -> None:
     logger = get_run_logger()
+    _dbt_deps()
+
     cmd = _base_dbt_cmd("run", "financials_score")
     if full_refresh:
         cmd.append("--full-refresh")
@@ -59,6 +39,8 @@ def dbt_run_financials_score_task(full_refresh: bool = False) -> None:
 @task(name="dbt-test-financials-score", retries=0)
 def dbt_test_financials_score_task() -> None:
     logger = get_run_logger()
+    _dbt_deps()
+
     cmd = _base_dbt_cmd("test", "financials_score")
     logger.info(f"Running: {' '.join(cmd)}")
     result = _run_dbt(cmd)

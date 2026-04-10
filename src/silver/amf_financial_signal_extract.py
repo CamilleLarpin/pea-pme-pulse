@@ -648,6 +648,12 @@ def fetch_bronze_documents(
     """
 
     rows = client.query(query).result()
+    job_config = bigquery.QueryJobConfig(job_timeout_ms=300_000)
+    try:
+        rows = client.query(query, job_config=job_config).result(timeout=300)
+    except Exception as e:
+        logger.error(f"BigQuery query timed out or failed: {e}")
+        raise
 
     documents = []
     for row in rows:
@@ -715,7 +721,7 @@ def append_rows_to_bq(
                 full_table_id,
                 job_config=job_config,
             )
-            job.result()
+            job.result(timeout=120)
 
     logger.info("{} row(s) appended to {}", len(rows), full_table_id)
 
@@ -742,7 +748,7 @@ def download_pdf_bytes_from_gcs(
     bucket_name, blob_name = parse_gcs_uri(gcs_uri)
     bucket = storage_client.bucket(bucket_name)
     blob = bucket.blob(blob_name)
-    return blob.download_as_bytes()
+    return blob.download_as_bytes(timeout=60)
 
 
 def extract_text_with_pdfplumber(pdf_bytes: bytes) -> tuple[str, int]:
