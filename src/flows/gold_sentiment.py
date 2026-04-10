@@ -128,7 +128,7 @@ def dbt_run_gold() -> None:
         "dbt",
         "run",
         "--select",
-        "gold.score_news",
+        "gold.score_news gold.company_scores",
         "--project-dir",
         str(DBT_PROJECT_DIR),
     ]

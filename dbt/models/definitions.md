@@ -47,7 +47,7 @@ Normalized ranking score 1–10 derived from avg_sentiment_45d via PERCENT_RANK 
 {% enddocs %}
 
 {% docs score_date %}
-Calendar date (Europe/Paris timezone) when this snapshot of score_news was computed. Since score_news is materialized as a table and rebuilt each run, score_date reflects the most recent pipeline execution.
+Calendar date (Europe/Paris timezone) when this score snapshot was computed. Used as the historisation key in incremental models — one row per (isin, score_date) per pipeline run. Filter on CURRENT_DATE('Europe/Paris') to get the latest snapshot.
 {% enddocs %}
 
 {% docs title %}
