@@ -1,11 +1,14 @@
--- Gold: investment news score per company — daily snapshot
--- grain: 1 row per ISIN, rebuilt each run
+-- Gold: investment news score per company — daily historised snapshot
+-- grain: 1 row per (isin, score_date) — one snapshot per pipeline run
 -- window: 45-day rolling, anchored on published_at (always non-null in gold.article_sentiment)
 -- mention_count: number of scored articles in window
 -- avg_sentiment: average Groq sentiment score (0–10) over window
 -- investment_score: PERCENT_RANK of avg_sentiment rescaled to 1–10
 
-{{ config(materialized='table') }}
+{{ config(
+    materialized='incremental',
+    unique_key=['isin', 'score_date']
+) }}
 
 with sentiment_45d as (
     select
