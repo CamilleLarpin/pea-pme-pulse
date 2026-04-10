@@ -63,37 +63,52 @@ def load_score_history(isins: tuple[str, ...], days: int) -> pd.DataFrame:
 
 @st.cache_data(ttl=3600)
 def load_company_scores() -> pd.DataFrame:
-    resp = requests.get(f"{get_api_base_url()}/gold/company-scores/latest", timeout=120)
-    resp.raise_for_status()
-    return pd.DataFrame(resp.json())
+    try:
+        resp = requests.get(f"{get_api_base_url()}/gold/company-scores/latest", timeout=120)
+        resp.raise_for_status()
+        return pd.DataFrame(resp.json())
+    except Exception:
+        return pd.DataFrame()
 
 
 @st.cache_data(ttl=3600)
 def load_news_scores() -> pd.DataFrame:
-    resp = requests.get(f"{get_api_base_url()}/gold/score-news/latest", timeout=120)
-    resp.raise_for_status()
-    return pd.DataFrame(resp.json())
+    try:
+        resp = requests.get(f"{get_api_base_url()}/gold/score-news/latest", timeout=120)
+        resp.raise_for_status()
+        return pd.DataFrame(resp.json())
+    except Exception:
+        return pd.DataFrame()
 
 
 @st.cache_data(ttl=3600)
 def load_insider_scores() -> pd.DataFrame:
-    resp = requests.get(f"{get_api_base_url()}/gold/score-insider/latest", timeout=120)
-    resp.raise_for_status()
-    return pd.DataFrame(resp.json())
+    try:
+        resp = requests.get(f"{get_api_base_url()}/gold/score-insider/latest", timeout=120)
+        resp.raise_for_status()
+        return pd.DataFrame(resp.json())
+    except Exception:
+        return pd.DataFrame()
 
 
 @st.cache_data(ttl=3600)
 def load_financials_scores() -> pd.DataFrame:
-    resp = requests.get(f"{get_api_base_url()}/gold/financials-score/latest", timeout=120)
-    resp.raise_for_status()
-    return pd.DataFrame(resp.json())
+    try:
+        resp = requests.get(f"{get_api_base_url()}/gold/financials-score/latest", timeout=120)
+        resp.raise_for_status()
+        return pd.DataFrame(resp.json())
+    except Exception:
+        return pd.DataFrame()
 
 
 @st.cache_data(ttl=3600)
 def load_article_sentiments() -> pd.DataFrame:
-    resp = requests.get(f"{get_api_base_url()}/gold/article-sentiment/latest", timeout=120)
-    resp.raise_for_status()
-    return pd.DataFrame(resp.json())
+    try:
+        resp = requests.get(f"{get_api_base_url()}/gold/article-sentiment/latest", timeout=120)
+        resp.raise_for_status()
+        return pd.DataFrame(resp.json())
+    except Exception:
+        return pd.DataFrame()
 
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
