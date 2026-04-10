@@ -50,6 +50,7 @@ class StockScore(BaseModel):
     date: date
     close: float
     score_technique: float
+    score_7d_avg: float | None
     rsi_signal: float
     macd_signal: float
     golden_cross_signal: float
@@ -134,6 +135,7 @@ def get_latest_scores():
             date,
             Close AS close,
             score_technique,
+            score_7d_avg,
             rsi_signal,
             macd_signal,
             golden_cross_signal,
@@ -141,7 +143,7 @@ def get_latest_scores():
             trend_signal
         FROM `{GCP_PROJECT}.{GOLD_DATASET}.stocks_score`
         WHERE is_latest = TRUE
-        ORDER BY score_technique DESC
+        ORDER BY score_technique DESC, score_7d_avg DESC
     """
     return [dict(row) for row in client.query(query).result()]
 
