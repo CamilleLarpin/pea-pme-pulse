@@ -33,6 +33,21 @@ DBT_PROJECT_DIR = Path(__file__).parent.parent.parent / "dbt"
 GCP_PROJECT = "bootcamp-project-pea-pme"
 
 
+@task(name="dbt-deps")
+def dbt_deps() -> None:
+    logger = get_run_logger()
+    result = subprocess.run(
+        ["dbt", "deps", "--project-dir", str(DBT_PROJECT_DIR)],
+        capture_output=True,
+        text=True,
+    )
+    logger.info("dbt stdout:\n%s", result.stdout)
+    if result.returncode != 0:
+        logger.error("dbt stderr:\n%s", result.stderr)
+        raise RuntimeError(f"dbt deps failed (exit {result.returncode})")
+    logger.info("dbt-deps complete")
+
+
 @task(name="dbt-run-silver", retries=1, retry_delay_seconds=60)
 def dbt_run_silver() -> None:
     logger = get_run_logger()
@@ -86,6 +101,7 @@ def bronze_silver_rss_flow() -> None:
     logger = get_run_logger()
     yahoo_rss_flow()
     google_news_rss_flow()
+    dbt_deps()
     dbt_run_silver()
     logger.info("bronze-silver-rss complete — triggering silver-gold-rss")
     run_deployment("silver-gold-rss/silver-gold-rss", timeout=0)
