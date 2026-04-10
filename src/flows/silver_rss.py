@@ -1,7 +1,7 @@
-"""Prefect flow — Bronze RSS → Silver dbt orchestration.
+"""Prefect flow — RSS pipeline orchestrator (Bronze → Silver → Gold).
 
-Runs both Bronze RSS flows as subflows, then triggers dbt Silver refresh.
-Silver only runs if both Bronze flows succeed.
+Runs Bronze RSS subflows (Yahoo, Google News), then dbt Silver refresh,
+then Gold sentiment scoring. Each step only runs if the previous succeeds.
 """
 
 import os
@@ -16,10 +16,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from prefect import flow, get_run_logger, task  # noqa: E402
-from prefect.deployments import run_deployment  # noqa: E402
 
 from flows.bronze_google_news_rss import google_news_rss_flow  # noqa: E402
 from flows.bronze_yahoo_rss import yahoo_rss_flow  # noqa: E402
+from flows.gold_sentiment import silver_gold_rss_flow  # noqa: E402
 
 # GCP credentials — same pattern as Bronze flows; Bronze imports below are no-ops if already set
 _gcp_creds_json = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS_JSON")
@@ -103,9 +103,9 @@ def bronze_silver_rss_flow() -> None:
     google_news_rss_flow()
     dbt_deps()
     dbt_run_silver()
-    logger.info("bronze-silver-rss complete — triggering silver-gold-rss")
-    run_deployment("silver-gold-rss/silver-gold-rss", timeout=0)
-    logger.info("silver-gold-rss triggered")
+    logger.info("bronze-silver-rss complete — starting silver-gold-rss")
+    silver_gold_rss_flow()
+    logger.info("silver-gold-rss complete")
 
 
 if __name__ == "__main__":
