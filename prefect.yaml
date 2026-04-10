@@ -63,11 +63,11 @@ deployments:
       name: pea-pme
       work_queue_name: default
 
-  - name: bronze-yfinance-ohlcv
+  - name: yfinance-ohlcv-pipeline
     version: "0.1.0"
-    tags: ["bronze", "ohlcv", "yfinance"]
-    description: "Bronze ingestion daily at 8h Paris — yfinance OHLCV for all PEA-PME ISINs"
-    entrypoint: src/flows/bronze_yfinance_ohlcv.py:yfinance_ohlcv_flow
+    tags: ["bronze", "silver", "gold", "ohlcv", "yfinance", "orchestrator"]
+    description: "yfinance pipeline bronze→silver→gold — OHLCV + stocks_score + company_scores. Daily weekdays 19h30 Paris."
+    entrypoint: src/flows/yfinance_pipeline.py:yfinance_ohlcv_pipeline_flow
     concurrency_limit: 1
     schedule:
       cron: "30 19 * * 1-5"
@@ -111,16 +111,6 @@ deployments:
           GCP_PROJECT_ID: "bootcamp-project-pea-pme"
           GCS_BUCKET_NAME: "project-pea-pme"
           BQ_DATASET_BRONZE: "bronze"
-
-  - name: silver-yfinance-ohlcv
-    version: "0.1.0"
-    tags: ["silver", "ohlcv", "yfinance"]
-    description: "Silver yfinance OHLCV — dbt clean + technical indicators. Triggered by bronze-yfinance-ohlcv on completion."
-    entrypoint: src/flows/silver_yfinance_ohlcv.py:silver_yfinance_ohlcv_flow
-    concurrency_limit: 1
-    work_pool:
-      name: pea-pme
-      work_queue_name: default
 
   - name: bronze-silver-gold-boursorama
     version: "0.1.0"

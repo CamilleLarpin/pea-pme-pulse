@@ -15,7 +15,6 @@ if _gcp_creds_json and not os.environ.get("GOOGLE_APPLICATION_CREDENTIALS"):
     os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = _tmp.name
 
 from prefect import flow, get_run_logger, task  # noqa: E402
-from prefect.deployments import run_deployment  # noqa: E402
 
 
 @task(name="yfinance-ohlcv-ingest", retries=2, retry_delay_seconds=60)
@@ -45,8 +44,6 @@ def yfinance_ohlcv_flow() -> None:
         stats["failed"],
         stats["total"],
     )
-    logger.info("Déclenchement silver-yfinance-ohlcv")
-    run_deployment("silver-yfinance-ohlcv/silver-yfinance-ohlcv", timeout=0)
 
 
 if __name__ == "__main__":
