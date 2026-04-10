@@ -1,6 +1,6 @@
 # Prefect deployment — Bronze RSS ingestion + Silver dbt orchestration
 # Deploy: prefect deploy --all
-# Worker: prefect worker start --pool bronze-pool
+# Worker: prefect worker start --pool pea-pme
 
 name: pea-pme-pulse
 prefect-version: "3.6.24"
@@ -27,7 +27,7 @@ deployments:
       cron: "0 */4 * * *"
       timezone: "Europe/Paris"
     work_pool:
-      name: bronze-pool
+      name: pea-pme
       work_queue_name: default
       job_variables:
         env:
@@ -39,7 +39,7 @@ deployments:
     description: "Bronze ingestion (manual) — Yahoo Finance FR RSS"
     entrypoint: src/flows/bronze_yahoo_rss.py:yahoo_rss_flow
     work_pool:
-      name: bronze-pool
+      name: pea-pme
       work_queue_name: default
 
   - name: silver-gold-rss
@@ -48,7 +48,7 @@ deployments:
     description: "Score unscored Silver RSS articles via Groq → write gold.article_sentiment → dbt gold.score_news"
     entrypoint: src/flows/gold_sentiment.py:silver_gold_rss_flow
     work_pool:
-      name: bronze-pool
+      name: pea-pme
       work_queue_name: default
       job_variables:
         env:
@@ -60,7 +60,7 @@ deployments:
     description: "Bronze ingestion (manual) — Google News RSS"
     entrypoint: src/flows/bronze_google_news_rss.py:google_news_rss_flow
     work_pool:
-      name: bronze-pool
+      name: pea-pme
       work_queue_name: default
 
   - name: bronze-yfinance-ohlcv
@@ -73,7 +73,7 @@ deployments:
       cron: "30 19 * * 1-5"
       timezone: "Europe/Paris"
     work_pool:
-      name: bronze-pool
+      name: pea-pme
       work_queue_name: default
 
   - name: bronze-amf
@@ -85,7 +85,7 @@ deployments:
       cron: "0 */4 * * *"
       timezone: "Europe/Paris"
     work_pool:
-      name: bronze-pool
+      name: pea-pme
       work_queue_name: default
       job_variables:
         env:
@@ -101,7 +101,7 @@ deployments:
       cron: "0 8 * * 1-5"
       timezone: "Europe/Paris"
     work_pool:
-      name: bronze-pool
+      name: pea-pme
       work_queue_name: default
       job_variables:
         env:
@@ -118,7 +118,7 @@ deployments:
     entrypoint: src/flows/silver_yfinance_ohlcv.py:silver_yfinance_ohlcv_flow
     concurrency_limit: 1
     work_pool:
-      name: silver-pool
+      name: pea-pme
       work_queue_name: default
 
   - name: bronze-silver-gold-boursorama
@@ -130,25 +130,25 @@ deployments:
       cron: "0 8 1 * *"
       timezone: "Europe/Paris"
     work_pool:
-      name: silver-pool
+      name: pea-pme
       work_queue_name: default
 
- - name: silver-insider-signals
+  - name: silver-insider-signals
     version: "0.1.0"
     tags: ["silver", "amf", "insider"]
     description: "Silver amf insider signals — dbt clean + technical indicators. Triggered by bronze_amf_flux on completion."
     entrypoint: src/flows/silver_amf_insider_signals.py:silver_amf_insider_signals_flow
     concurrency_limit: 1
     work_pool:
-      name: silver-pool
+      name: pea-pme
       work_queue_name: default
 
- - name: gold-insider-signals
+  - name: gold-insider-signals
     version: "0.1.0"
     tags: ["gold", "amf", "insider"]
     description: "Gold amf insider signals — dbt clean + technical indicators. Triggered by silver-insider-signals on completion."
     entrypoint: src/flows/gold_insider_signals.py:gold_insider_signals_flow
     concurrency_limit: 1
     work_pool:
-      name: gold-pool
+      name: pea-pme
       work_queue_name: default
