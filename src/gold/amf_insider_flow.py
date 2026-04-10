@@ -6,11 +6,31 @@ from loguru import logger
 
 from src.gold.amf_insider_score import compute_insider_score
 
+# --- CONFIGURATION ---
 GCP_PREFIX_INPUT_TABLE_ID = "amf_insider_signals"
 GCP_PREFIX_OUTPUT_TABLE_ID = "score_insider_signals"
 
 
 def run_insider_scoring():
+    """
+    Orchestrates the scoring pipeline from Silver to Gold BigQuery layers.
+
+    Steps:
+    1. Fetches validated insider signals from the Silver dataset.
+    2. Computes sentiment scores using the amf_insider_score logic.
+    3. Normalizes and validates data types (specifically ensuring DATE format).
+    4. Performs an idempotent MERGE into the Gold target table via a staging area.
+
+    Inputs (Environment Variables):
+        - GOOGLE_APPLICATION_CREDENTIALS: Path to GCP service account JSON.
+        - GCP_PROJECT_ID: The target Google Cloud project.
+        - BQ_DATASET_SILVER: Source dataset containing signals.
+        - BQ_DATASET_GOLD: Destination dataset for scores.
+
+    Outputs:
+        - Updates or inserts records in the {project}.{dataset_gold}.score_insider_signals table.
+    """
+
     # Setting up GCP credentials and BigQuery client
     gcp_json_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
     project_id = os.getenv("GCP_PROJECT_ID", "bootcamp-project-pea-pme")
@@ -24,7 +44,7 @@ def run_insider_scoring():
     target_table = f"{project_id}.{dataset_gold}.{GCP_PREFIX_OUTPUT_TABLE_ID}"
     staging_table = f"{target_table}_staging"
 
-    # Extraction from Silver
+    # Extract-Transform-Load (ETL) Process (Extract and Transform steps from Silver to Gold)
     logger.info("📥 Fetching silver signals...")
     try:
         query = f"SELECT * FROM `{project_id}.{os.getenv('BQ_DATASET_SILVER')}.{GCP_PREFIX_INPUT_TABLE_ID}`"
@@ -37,15 +57,15 @@ def run_insider_scoring():
         logger.warning("⚠️ No data to process.")
         return
 
-    # Processing & Scoring
+    # Process data and compute scores using the imported function from amf_insider_score.py
     logger.info(f"🧪 Scoring {len(df_silver)} rows...")
     df_gold = compute_insider_score(df_silver)
     df_gold["updated_at"] = pd.Timestamp.now(tz="UTC")
 
-    # CRITICAL: Force signal_date to datetime so BigQuery doesn't default to STRING
+    # Critical: force signal_date to datetime so BigQuery doesn't default to STRING
     df_gold["signal_date"] = pd.to_datetime(df_gold["signal_date"]).dt.date
 
-    # Check if target table exists, if not create with explicit schema to ensure signal_date is DATE
+    # Check if target table exists; if not, initialize it with a strictly typed schema
     try:
         client.get_table(target_table)
         logger.info(f"✅ Target table {GCP_PREFIX_OUTPUT_TABLE_ID} exists.")
@@ -54,7 +74,7 @@ def run_insider_scoring():
             f"⚠️ Table {GCP_PREFIX_OUTPUT_TABLE_ID} not found. Creating with explicit schema..."
         )
 
-        # We explicitly define signal_date as DATE
+        # Explicitly define schema to ensure BQ creates the 'DATE' type (not STRING)
         schema = [
             bigquery.SchemaField("isin", "STRING"),
             bigquery.SchemaField("signal_date", "DATE"),
@@ -67,20 +87,19 @@ def run_insider_scoring():
             bigquery.SchemaField("updated_at", "TIMESTAMP"),
         ]
 
-        # Schema is required to ensure signal_date is created as DATE type, preventing future merge issues
+        # Initializing the empty table with the schema above
         job_config_init = bigquery.LoadJobConfig(schema=schema, write_disposition="WRITE_EMPTY")
         client.load_table_from_dataframe(
             df_gold.iloc[0:0], target_table, job_config=job_config_init
         ).result()
         logger.success("🆕 Target table created successfully with DATE type.")
 
-    # Idempotent Merge into Gold
+    # Persist results to Gold layer using a staging table and an idempotent MERGE
     logger.info("📤 Loading staging...")
-    # Autodetect schema for staging based on the corrected df_gold
     job_config_staging = bigquery.LoadJobConfig(write_disposition="WRITE_TRUNCATE")
     client.load_table_from_dataframe(df_gold, staging_table, job_config=job_config_staging).result()
 
-    # REMOVED CASTS: Since both are now DATE types, simple equality works
+    # Execute Idempotent MERGE (Upsert logic based on ISIN and Date)
     merge_query = f"""
     MERGE `{target_table}` T
     USING `{staging_table}` S
@@ -105,6 +124,7 @@ def run_insider_scoring():
     except Exception as e:
         logger.error(f"🔥 Merge error: {e}")
     finally:
+        # Cleanup staging resources
         client.delete_table(staging_table, not_found_ok=True)
 
 
