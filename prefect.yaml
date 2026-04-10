@@ -89,16 +89,6 @@ deployments:
           GCP_PROJECT_ID: "bootcamp-project-pea-pme"
           GCS_BUCKET_NAME: "project-pea-pme"
 
-  - name: silver-yfinance-ohlcv
-    version: "0.1.0"
-    tags: ["silver", "ohlcv", "yfinance"]
-    description: "Silver yfinance OHLCV — dbt clean + technical indicators. Triggered by bronze-yfinance-ohlcv on completion."
-    entrypoint: src/flows/silver_yfinance_ohlcv.py:silver_yfinance_ohlcv_flow
-    concurrency_limit: 1
-    work_pool:
-      name: bronze-pool
-      work_queue_name: default
-
   - name: bronze-abcbourse-rss
     version: "0.1.0"
     tags: ["bronze", "rss", "abcbourse"]
@@ -117,6 +107,17 @@ deployments:
           GCS_BUCKET_NAME: "project-pea-pme"
           BQ_DATASET_BRONZE: "bronze"
 
+
+  - name: silver-yfinance-ohlcv
+    version: "0.1.0"
+    tags: ["silver", "ohlcv", "yfinance"]
+    description: "Silver yfinance OHLCV — dbt clean + technical indicators. Triggered by bronze-yfinance-ohlcv on completion."
+    entrypoint: src/flows/silver_yfinance_ohlcv.py:silver_yfinance_ohlcv_flow
+    concurrency_limit: 1
+    work_pool:
+      name: silver-pool
+      work_queue_name: default
+
   - name: bronze-silver-gold-boursorama
     version: "0.1.0"
     tags: ["bronze", "silver", "gold", "boursorama", "orchestrator"]
@@ -126,5 +127,25 @@ deployments:
       cron: "0 8 1 * *"
       timezone: "Europe/Paris"
     work_pool:
-      name: bronze-pool
+      name: silver-pool
+      work_queue_name: default
+
+ - name: silver-insider-signals
+    version: "0.1.0"
+    tags: ["silver", "amf", "insider"]
+    description: "Silver amf insider signals — dbt clean + technical indicators. Triggered by bronze_amf_flux on completion."
+    entrypoint: src/flows/silver_amf_insider_signals.py:silver_amf_insider_signals_flow
+    concurrency_limit: 1
+    work_pool:
+      name: silver-pool
+      work_queue_name: default
+
+ - name: gold-insider-signals
+    version: "0.1.0"
+    tags: ["gold", "amf", "insider"]
+    description: "Gold amf insider signals — dbt clean + technical indicators. Triggered by silver-insider-signals on completion."
+    entrypoint: src/flows/gold_insider_signals.py:gold_insider_signals_flow
+    concurrency_limit: 1
+    work_pool:
+      name: gold-pool
       work_queue_name: default
