@@ -12,7 +12,7 @@
     unique_key=['isin', 'Date'],
     incremental_strategy='merge',
     on_schema_change='fail',
-    partition_by={'field': 'Date', 'data_type': 'date'},
+    partition_by={'field': 'Date', 'data_type': 'date', 'granularity': 'month'},
     cluster_by=['isin'],
 ) }}
 
