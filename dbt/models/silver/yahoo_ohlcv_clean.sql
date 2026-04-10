@@ -12,6 +12,8 @@
     unique_key=['isin', 'Date'],
     incremental_strategy='merge',
     on_schema_change='fail',
+    partition_by={'field': 'Date', 'data_type': 'date'},
+    cluster_by=['isin'],
 ) }}
 
 with raw as (
