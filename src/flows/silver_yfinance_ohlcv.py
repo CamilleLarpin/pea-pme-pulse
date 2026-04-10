@@ -42,6 +42,7 @@ def dbt_deps() -> None:
     if result.returncode != 0:
         logger.error("dbt deps stderr:\n%s", result.stderr)
         raise RuntimeError(f"dbt deps failed (exit {result.returncode})")
+    logger.info("dbt-deps complete")
 
 
 @task(name="dbt-run-yahoo-ohlcv-clean", retries=1, retry_delay_seconds=60)
