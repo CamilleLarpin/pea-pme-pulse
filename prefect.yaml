@@ -20,8 +20,8 @@ pull:
 deployments:
   - name: bronze-silver-rss
     version: "0.1.0"
-    tags: ["bronze", "silver", "rss", "orchestrator"]
-    description: "Bronze RSS ingestion (Yahoo + Google News) → Silver dbt refresh, every 4h"
+    tags: ["bronze", "silver", "gold", "rss", "orchestrator"]
+    description: "RSS pipeline (Yahoo + Google News) — Bronze → Silver dbt → Gold sentiment, every 4h"
     entrypoint: src/flows/silver_rss.py:bronze_silver_rss_flow
     schedule:
       cron: "0 */4 * * *"
@@ -29,6 +29,9 @@ deployments:
     work_pool:
       name: bronze-pool
       work_queue_name: default
+      job_variables:
+        env:
+          GROQ_API_KEY: "{{ prefect.blocks.secret.groq-api-key }}"
 
   - name: bronze-yahoo-rss
     version: "0.1.0"
