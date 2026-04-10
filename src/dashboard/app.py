@@ -121,9 +121,9 @@ def render_sidebar() -> None:
             """
 **Score composite 0 – 10** = moyenne de 4 dimensions à 25% chacune.
 
-🟢 **7 – 10** : Signal positif fort
+🟢 **6 – 10** : Signal positif
 
-🟡 **4 – 7** : Signal mixte
+🟡 **4 – 6** : Signal mixte
 
 🔴 **0 – 4** : Signal négatif
 
@@ -160,6 +160,30 @@ def render_sidebar() -> None:
         )
 
 
+# ── Data freshness ────────────────────────────────────────────────────────────
+
+
+def render_freshness(
+    df_composite: pd.DataFrame,
+    df_news: pd.DataFrame,
+    df_insider: pd.DataFrame,
+    df_financials: pd.DataFrame,
+) -> None:
+    parts = []
+    if not df_composite.empty and "score_date" in df_composite.columns:
+        parts.append(f"**Composite** {df_composite['score_date'].max()}")
+    if not df_news.empty and "score_date" in df_news.columns:
+        parts.append(f"**Actualités** {df_news['score_date'].max()}")
+    if not df_insider.empty and "signal_date" in df_insider.columns:
+        parts.append(f"**Insiders** {df_insider['signal_date'].max()}")
+    if not df_financials.empty and "date_cloture_exercice" in df_financials.columns:
+        parts.append(
+            f"**Fondamentaux** {df_financials['date_cloture_exercice'].max()} (dernière clôture)"
+        )
+    if parts:
+        st.caption("Données au : " + " · ".join(parts))
+
+
 # ── Global KPIs (composite) ───────────────────────────────────────────────────
 
 
@@ -167,7 +191,7 @@ def render_global_kpis(df: pd.DataFrame) -> None:
     total = len(df)
     top_row = df.iloc[0]
     avg_score = df["composite_score"].mean()
-    opportunities = int((df["composite_score"] >= 7).sum())
+    opportunities = int((df["composite_score"] >= 6).sum())
 
     c1, c2, c3, c4 = st.columns(4)
     c1.metric(
@@ -181,9 +205,9 @@ def render_global_kpis(df: pd.DataFrame) -> None:
         help="Moyenne du score composite sur l'ensemble des PME scorées",
     )
     c3.metric(
-        "Opportunités ≥ 7",
+        "Opportunités ≥ 6",
         opportunities,
-        help="Entreprises avec un score composite ≥ 7 (signal positif fort)",
+        help="Entreprises avec un score composite ≥ 6 (signal positif)",
     )
     c4.metric(
         "Top société",
@@ -197,110 +221,113 @@ def render_global_kpis(df: pd.DataFrame) -> None:
 
 
 def render_composite_tab(df: pd.DataFrame) -> None:
-    col_left, col_right = st.columns([3, 2])
+    st.subheader("Classement composite")
+    st.caption("Score moyen pondéré de 4 dimensions · 25% chacune.")
 
-    with col_left:
-        st.subheader("Classement composite")
-        st.caption("Score moyen pondéré de 4 dimensions · 25% chacune.")
+    top25 = df.head(25).copy().reset_index(drop=True)
+    top25["#"] = top25.index + 1
+    display = top25[
+        [
+            "#",
+            "name",
+            "composite_score",
+            "score_news",
+            "score_stock",
+            "score_insider",
+            "score_financials",
+        ]
+    ].rename(
+        columns={
+            "name": "Entreprise",
+            "composite_score": "Score global (/10)",
+            "score_news": "Actualités",
+            "score_stock": "Technique",
+            "score_insider": "Insiders",
+            "score_financials": "Fondamentaux",
+        }
+    )
+    score_cols = ["Score global (/10)", "Actualités", "Technique", "Insiders", "Fondamentaux"]
+    styled = (
+        display.set_index("#")
+        .style.background_gradient(subset=score_cols, cmap="RdYlGn", vmin=0, vmax=10)
+        .format({col: "{:.1f}" for col in score_cols})
+    )
+    st.dataframe(styled, use_container_width=True)
 
-        top25 = df.head(25).copy().reset_index(drop=True)
-        top25["#"] = top25.index + 1
-        display = top25[
-            [
-                "#",
-                "name",
-                "composite_score",
-                "score_news",
-                "score_stock",
-                "score_insider",
-                "score_financials",
-            ]
-        ].rename(
-            columns={
-                "name": "Entreprise",
-                "composite_score": "Score global (/10)",
-                "score_news": "Actualités",
-                "score_stock": "Technique",
-                "score_insider": "Insiders",
-                "score_financials": "Fondamentaux",
-            }
+    st.divider()
+    col_hist, col_radar = st.columns([2, 1])
+
+    with col_hist:
+        st.subheader("Distribution des scores composites")
+        fig_hist = px.histogram(
+            df,
+            x="composite_score",
+            nbins=20,
+            color_discrete_sequence=["#1f4e79"],
+            labels={"composite_score": "Score composite"},
         )
-        score_cols = ["Score global (/10)", "Actualités", "Technique", "Insiders", "Fondamentaux"]
-        styled = (
-            display.set_index("#")
-            .style.background_gradient(subset=score_cols, cmap="RdYlGn", vmin=0, vmax=10)
-            .format({col: "{:.1f}" for col in score_cols})
+        fig_hist.add_vrect(
+            x0=0,
+            x1=4,
+            fillcolor="red",
+            opacity=0.07,
+            line_width=0,
+            annotation_text="Prudence",
+            annotation_position="top left",
         )
-        st.dataframe(styled, use_container_width=True)
+        fig_hist.add_vrect(
+            x0=4,
+            x1=6,
+            fillcolor="yellow",
+            opacity=0.07,
+            line_width=0,
+            annotation_text="Neutre",
+            annotation_position="top left",
+        )
+        fig_hist.add_vrect(
+            x0=6,
+            x1=10,
+            fillcolor="green",
+            opacity=0.07,
+            line_width=0,
+            annotation_text="Opportunité",
+            annotation_position="top left",
+        )
+        fig_hist.update_layout(height=300, bargap=0.05)
+        st.plotly_chart(
+            fig_hist,
+            use_container_width=True,
+            config={"displayModeBar": "hover", "displaylogo": False},
+        )
 
-    with col_right:
+    with col_radar:
         st.subheader("Profil — Top 5")
-        st.caption("Équilibre des 4 dimensions pour les 5 meilleures PME.")
-
+        st.caption("Équilibre des 4 dimensions.")
         top5 = df.head(5)
-        fig = go.Figure()
+        fig_radar = go.Figure()
         dims = list(SCORE_DIMS.values())
         dim_cols = list(SCORE_DIMS.keys())
         for _, row in top5.iterrows():
-            fig.add_trace(
+            fig_radar.add_trace(
                 go.Scatterpolar(
                     r=[row[c] for c in dim_cols],
                     theta=dims,
                     fill="toself",
                     opacity=0.5,
-                    name=str(row["name"])[:22],
+                    name=str(row["name"])[:20],
                 )
             )
-        fig.update_layout(
-            polar=dict(radialaxis=dict(range=[0, 10], tickfont=dict(size=9))),
-            height=380,
-            legend=dict(orientation="v", font=dict(size=10)),
-            margin=dict(l=20, r=20, t=30, b=20),
+        fig_radar.update_layout(
+            polar=dict(radialaxis=dict(range=[0, 10], tickfont=dict(size=8))),
+            height=300,
+            legend=dict(orientation="v", font=dict(size=9)),
+            margin=dict(l=10, r=10, t=30, b=10),
         )
         st.plotly_chart(
-            fig, use_container_width=True, config={"displayModeBar": "hover", "displaylogo": False}
+            fig_radar,
+            use_container_width=True,
+            config={"displayModeBar": "hover", "displaylogo": False},
         )
-
-    st.divider()
-    st.subheader("Distribution des scores composites")
-    fig_hist = px.histogram(
-        df,
-        x="composite_score",
-        nbins=20,
-        color_discrete_sequence=["#1f4e79"],
-        labels={"composite_score": "Score composite"},
-    )
-    fig_hist.add_vrect(
-        x0=0,
-        x1=4,
-        fillcolor="red",
-        opacity=0.07,
-        line_width=0,
-        annotation_text="Prudence",
-        annotation_position="top left",
-    )
-    fig_hist.add_vrect(
-        x0=4,
-        x1=7,
-        fillcolor="yellow",
-        opacity=0.07,
-        line_width=0,
-        annotation_text="Neutre",
-        annotation_position="top left",
-    )
-    fig_hist.add_vrect(
-        x0=7,
-        x1=10,
-        fillcolor="green",
-        opacity=0.07,
-        line_width=0,
-        annotation_text="Opportunité",
-        annotation_position="top left",
-    )
-    fig_hist.update_layout(height=260, bargap=0.05)
-    st.plotly_chart(
-        fig_hist, use_container_width=True, config={"displayModeBar": "hover", "displaylogo": False}
-    )
 
 
 # ── Tab B — Actualités ────────────────────────────────────────────────────────
@@ -382,7 +409,9 @@ def render_news_tab(df_news: pd.DataFrame, df_articles: pd.DataFrame) -> None:
 # ── Tab C — Insiders & Fondamentaux ──────────────────────────────────────────
 
 
-def render_insiders_financials_tab(df_insider: pd.DataFrame, df_financials: pd.DataFrame) -> None:
+def render_insiders_financials_tab(
+    df_insider: pd.DataFrame, df_financials: pd.DataFrame, df_stocks: pd.DataFrame
+) -> None:
     # ── Section Insiders ──────────────────────────────────────────────────────
     st.subheader("🏦 Signaux insiders AMF")
     st.caption("Achats d'actions déclarés à l'AMF par des dirigeants dans les 45 derniers jours.")
@@ -448,9 +477,14 @@ def render_insiders_financials_tab(df_insider: pd.DataFrame, df_financials: pd.D
     if df_financials.empty:
         st.info("Aucune donnée fondamentale disponible.")
     else:
-        display_fin = df_financials[
+        name_map = df_stocks.drop_duplicates("isin").set_index("isin")["company_name"]
+        df_fin = df_financials.copy()
+        df_fin["Entreprise"] = df_fin["isin"].map(name_map).fillna(df_fin["ticker"])
+
+        display_fin = df_fin[
             [
-                "ticker",
+                "Entreprise",
+                "date_cloture_exercice",
                 "score_fondamental",
                 "ca_growth_pct",
                 "marge_op_pct",
@@ -461,7 +495,7 @@ def render_insiders_financials_tab(df_insider: pd.DataFrame, df_financials: pd.D
             ]
         ].rename(
             columns={
-                "ticker": "Ticker",
+                "date_cloture_exercice": "Clôture",
                 "score_fondamental": "Score fond. (/10)",
                 "ca_growth_pct": "CA Growth (%)",
                 "marge_op_pct": "Marge Op (%)",
@@ -480,6 +514,7 @@ def render_insiders_financials_tab(df_insider: pd.DataFrame, df_financials: pd.D
                 "Marge Op (%)": "{:.1f}%",
                 "FCF Yield (%)": "{:.1f}%",
                 "Couverture": "{:.0%}",
+                "Clôture": "{}",
             },
             na_rep="—",
         )
@@ -553,19 +588,20 @@ def render_ranking(df: pd.DataFrame) -> None:
 
     top10 = df.head(10).copy().reset_index(drop=True)
     top10["#"] = top10.index + 1
-    top10["Percentile"] = (df["score_technique"].rank(pct=True) * 100).head(10).round(0).astype(int)
 
     for col in SIGNAL_COLS:
         top10[SIGNAL_LABELS[col]] = top10[col].map(SIGNAL_EMOJI)
 
     signal_label_cols = list(SIGNAL_LABELS.values())
     display = top10[
-        ["#", "company_name", "date", "score_technique", "Percentile", "Close"] + signal_label_cols
+        ["#", "company_name", "date", "score_technique", "score_7d_avg", "Close"]
+        + signal_label_cols
     ].rename(
         columns={
             "company_name": "Entreprise",
             "date": "Date du score",
             "score_technique": "Score (/10)",
+            "score_7d_avg": "Moy. 7j",
             "Close": "Cours (€)",
         }
     )
@@ -573,8 +609,8 @@ def render_ranking(df: pd.DataFrame) -> None:
     styled = (
         display.set_index("#")
         .style.background_gradient(subset=["Score (/10)"], cmap="RdYlGn", vmin=0, vmax=10)
-        .background_gradient(subset=["Percentile"], cmap="RdYlGn", vmin=0, vmax=100)
-        .format({"Score (/10)": "{:.1f}", "Cours (€)": "{:.2f}"})
+        .background_gradient(subset=["Moy. 7j"], cmap="RdYlGn", vmin=0, vmax=10)
+        .format({"Score (/10)": "{:.1f}", "Moy. 7j": "{:.1f}", "Cours (€)": "{:.2f}"})
     )
     st.dataframe(styled, use_container_width=True)
 
@@ -698,7 +734,7 @@ def render_history(top_isins: tuple[str, ...]) -> None:
         y=7,
         line_dash="dot",
         line_color="grey",
-        annotation_text="Seuil haussier (7)",
+        annotation_text="Seuil haussier (6)",
         annotation_position="bottom right",
     )
     fig_avg.update_layout(height=300, yaxis={"range": [0, 10]})
@@ -716,10 +752,10 @@ def render_history(top_isins: tuple[str, ...]) -> None:
         labels={"score_technique": "Score (/10)", "company_name": "Entreprise", "date": "Date"},
     )
     fig.add_hline(
-        y=7,
+        y=6,
         line_dash="dot",
         line_color="grey",
-        annotation_text="Seuil haussier (7)",
+        annotation_text="Seuil haussier (6)",
         annotation_position="bottom right",
     )
     fig.update_layout(height=300, yaxis={"range": [0, 10]})
@@ -751,8 +787,14 @@ def main() -> None:
         df_financials = load_financials_scores()
         df_articles = load_article_sentiments()
 
+    if not df_stocks.empty:
+        df_stocks = df_stocks.sort_values(
+            ["score_technique", "score_7d_avg"], ascending=False
+        ).reset_index(drop=True)
+
     if not df_composite.empty:
         render_global_kpis(df_composite)
+        render_freshness(df_composite, df_news, df_insider, df_financials)
         st.divider()
 
     tab_A, tab_B, tab_C, tab_D = st.tabs(
@@ -777,7 +819,7 @@ def main() -> None:
             render_news_tab(df_news, df_articles)
 
     with tab_C:
-        render_insiders_financials_tab(df_insider, df_financials)
+        render_insiders_financials_tab(df_insider, df_financials, df_stocks)
 
     with tab_D:
         if df_stocks.empty:
