@@ -76,13 +76,13 @@ deployments:
       name: bronze-pool
       work_queue_name: default
 
-  - name: bronze-amf
+  - name: amf-pipeline
     version: "0.1.0"
-    tags: ["bronze", "amf"]
-    description: "Bronze ingestion AMF"
-    entrypoint: src/flows/bronze_amf_flux.py:amf_flux_flow
+    tags: ["bronze", "silver", "gold", "amf", "financial", "orchestrator"]
+    description: "AMF financial pipeline - fetch API data -> extract PDF financial data -> scoring companies"
+    entrypoint: src/flows/pipeline_amf.py:amf_financial_signal_pipeline_flow
     schedule:
-      cron: "0 */4 * * *"
+      cron: "0 0 1 4,10 *"
       timezone: "Europe/Paris"
     work_pool:
       name: bronze-pool
@@ -91,6 +91,8 @@ deployments:
         env:
           GCP_PROJECT_ID: "bootcamp-project-pea-pme"
           GCS_BUCKET_NAME: "project-pea-pme"
+          AMF_ACTIVE_PROMPT_VERSION: "v5"
+          GROQ_API_KEY: "{{ prefect.blocks.secret.groq-api-key }}"
 
   - name: bronze-abcbourse-rss
     version: "0.1.0"
@@ -109,7 +111,6 @@ deployments:
           GCP_PROJECT_ID: "bootcamp-project-pea-pme"
           GCS_BUCKET_NAME: "project-pea-pme"
           BQ_DATASET_BRONZE: "bronze"
-
 
   - name: silver-yfinance-ohlcv
     version: "0.1.0"
@@ -133,7 +134,7 @@ deployments:
       name: silver-pool
       work_queue_name: default
 
- - name: silver-insider-signals
+  - name: silver-insider-signals
     version: "0.1.0"
     tags: ["silver", "amf", "insider"]
     description: "Silver amf insider signals — dbt clean + technical indicators. Triggered by bronze_amf_flux on completion."
@@ -143,7 +144,7 @@ deployments:
       name: silver-pool
       work_queue_name: default
 
- - name: gold-insider-signals
+  - name: gold-insider-signals
     version: "0.1.0"
     tags: ["gold", "amf", "insider"]
     description: "Gold amf insider signals — dbt clean + technical indicators. Triggered by silver-insider-signals on completion."

@@ -39,6 +39,7 @@ SELECT * FROM (
                 ) AS rn
             FROM {{ ref('amf_financial_signal') }}
             WHERE date_cloture_exercice IS NOT NULL
+                AND ticker IS NOT NULL
         )
         WHERE rn = 1
     ),
