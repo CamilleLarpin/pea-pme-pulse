@@ -21,7 +21,6 @@ Optional:
 from __future__ import annotations
 
 import os
-import subprocess
 import sys
 from pathlib import Path
 
@@ -29,7 +28,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from prefect import flow, get_run_logger, task
 
-from flows.utils.dbt import _dbt_deps
+from flows.utils.dbt import _dbt_deps, _log_dbt_output, _run_dbt_cmd
 from silver.amf_financial_signal_extract import run_financial_signal_extract
 
 # ============================================================================
@@ -76,29 +75,21 @@ def dbt_run_amf_financial_signal(
     logger = get_run_logger()
     _dbt_deps()
 
+    extra_args = []
+    if full_refresh:
+        extra_args.append("--full-refresh")
+
     active_prompt_version = os.environ.get("AMF_ACTIVE_PROMPT_VERSION")
 
-    cmd = ["dbt", "run", "--select", "amf_financial_signal", "--project-dir", str(DBT_PROJECT_DIR)]
-
-    if full_refresh:
-        cmd.append("--full-refresh")
-
     if active_prompt_version:
-        cmd += ["--vars", f"{{amf_active_prompt_version: '{active_prompt_version}'}}"]
+        extra_args += ["--vars", f"{{amf_active_prompt_version: '{active_prompt_version}'}}"]
 
-    logger.info(f"Running dbt command: {' '.join(cmd)}")
-
-    result = subprocess.run(
-        cmd,
-        capture_output=True,
-        text=True,
+    result = _run_dbt_cmd(
+        "run",
+        "amf_financial_signal",
+        extra_args=extra_args,
     )
-
-    # Always log stdout/stderr for visibility in Prefect UI
-    if result.stdout:
-        logger.info(f"dbt stdout:\n{result.stdout}")
-    if result.stderr:
-        logger.warning(f"dbt stderr:\n{result.stderr}")
+    _log_dbt_output(logger, result)
 
     if result.returncode != 0:
         raise RuntimeError(
@@ -117,27 +108,8 @@ def dbt_test_amf_financial_signal() -> None:
     logger = get_run_logger()
     _dbt_deps()
 
-    cmd = [
-        "dbt",
-        "test",
-        "--select",
-        "amf_financial_signal",
-        "--project-dir",
-        str(DBT_PROJECT_DIR),
-    ]
-
-    logger.info(f"Running dbt test command: {' '.join(cmd)}")
-
-    result = subprocess.run(
-        cmd,
-        capture_output=True,
-        text=True,
-    )
-
-    if result.stdout:
-        logger.info(f"dbt test stdout:\n{result.stdout}")
-    if result.stderr:
-        logger.warning(f"dbt test stderr:\n{result.stderr}")
+    result = _run_dbt_cmd("test", "amf_financial_signal")
+    _log_dbt_output(logger, result)
 
     if result.returncode != 0:
         # Tests failures are warnings, not hard failures — log but don't raise
