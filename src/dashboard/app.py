@@ -588,7 +588,7 @@ def render_kpis(df: pd.DataFrame) -> None:
 
 def render_ranking(df: pd.DataFrame) -> None:
     st.subheader("Classement du jour")
-    st.caption("Score de 0 à 10 basé sur 5 indicateurs techniques.")
+    st.caption("Score de 0 à 10 basé sur 5 indicateurs techniques · En cas d'égalité, départagé par la moyenne glissante 7 jours (Moy. 7j).")
 
     top10 = df.head(10).copy().reset_index(drop=True)
     top10["#"] = top10.index + 1
