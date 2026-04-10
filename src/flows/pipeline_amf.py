@@ -6,8 +6,8 @@ Orchestrates the three layer flows as subflows in sequence.
 
 from __future__ import annotations
 
-import sys
 import subprocess
+import sys
 from pathlib import Path
 
 from prefect import flow, get_run_logger, task
@@ -33,9 +33,12 @@ def _log_dbt_output(logger, result: subprocess.CompletedProcess) -> None:
 
 def _base_dbt_cmd(subcommand: str, select: str) -> list[str]:
     return [
-        "dbt", subcommand,
-        "--select", select,
-        "--project-dir", str(DBT_PROJECT_DIR),
+        "dbt",
+        subcommand,
+        "--select",
+        select,
+        "--project-dir",
+        str(DBT_PROJECT_DIR),
     ]
 
 

@@ -28,7 +28,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from prefect import flow, get_run_logger, task
-from prefect.blocks.system import Secret
+
 from silver.amf_financial_signal_extract import run_financial_signal_extract
 
 # ============================================================================
@@ -77,11 +77,7 @@ def dbt_run_amf_financial_signal(
 
     active_prompt_version = os.environ.get("AMF_ACTIVE_PROMPT_VERSION")
 
-    cmd = [
-        "dbt", "run",
-        "--select", "amf_financial_signal",
-        "--project-dir", str(DBT_PROJECT_DIR)
-    ]
+    cmd = ["dbt", "run", "--select", "amf_financial_signal", "--project-dir", str(DBT_PROJECT_DIR)]
 
     if full_refresh:
         cmd.append("--full-refresh")
@@ -105,8 +101,7 @@ def dbt_run_amf_financial_signal(
 
     if result.returncode != 0:
         raise RuntimeError(
-            f"dbt run failed with return code {result.returncode}.\n"
-            f"stderr: {result.stderr}"
+            f"dbt run failed with return code {result.returncode}.\nstderr: {result.stderr}"
         )
 
     logger.info("dbt run amf_financial_signal completed successfully.")
@@ -121,9 +116,12 @@ def dbt_test_amf_financial_signal() -> None:
     logger = get_run_logger()
 
     cmd = [
-        "dbt", "test",
-        "--select", "amf_financial_signal",
-        "--project-dir", str(DBT_PROJECT_DIR),
+        "dbt",
+        "test",
+        "--select",
+        "amf_financial_signal",
+        "--project-dir",
+        str(DBT_PROJECT_DIR),
     ]
 
     logger.info(f"Running dbt test command: {' '.join(cmd)}")
