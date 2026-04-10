@@ -588,7 +588,9 @@ def render_kpis(df: pd.DataFrame) -> None:
 
 def render_ranking(df: pd.DataFrame) -> None:
     st.subheader("Classement du jour")
-    st.caption("Score de 0 à 10 basé sur 5 indicateurs techniques.")
+    st.caption(
+        "Score de 0 à 10 basé sur 5 indicateurs techniques · En cas d'égalité, départagé par la moyenne glissante 7 jours (Moy. 7j)."
+    )
 
     top10 = df.head(10).copy().reset_index(drop=True)
     top10["#"] = top10.index + 1
@@ -597,29 +599,25 @@ def render_ranking(df: pd.DataFrame) -> None:
         top10[SIGNAL_LABELS[col]] = top10[col].map(SIGNAL_EMOJI)
 
     signal_label_cols = list(SIGNAL_LABELS.values())
-    cols = ["#", "company_name", "date", "score_technique", "Close"] + signal_label_cols
-    rename_map = {
-        "company_name": "Entreprise",
-        "date": "Date du score",
-        "score_technique": "Score (/10)",
-        "Close": "Cours (€)",
-    }
-    if "score_7d_avg" in top10.columns:
-        cols.insert(4, "score_7d_avg")
-        rename_map["score_7d_avg"] = "Moy. 7j"
-    display = top10[cols].rename(columns=rename_map)
-
-    display_indexed = display.set_index("#")
-    has_7d = "Moy. 7j" in display_indexed.columns
-    fmt = {"Score (/10)": "{:.1f}", "Cours (€)": "{:.2f}"}
-    if has_7d:
-        fmt["Moy. 7j"] = "{:.1f}"
-    styled = display_indexed.style.background_gradient(
-        subset=["Score (/10)"], cmap="RdYlGn", vmin=0, vmax=10
+    display = top10[
+        ["#", "company_name", "date", "score_technique", "score_7d_avg", "Close"]
+        + signal_label_cols
+    ].rename(
+        columns={
+            "company_name": "Entreprise",
+            "date": "Date du score",
+            "score_technique": "Score (/10)",
+            "score_7d_avg": "Moy. 7j",
+            "Close": "Cours (€)",
+        }
     )
-    if has_7d:
-        styled = styled.background_gradient(subset=["Moy. 7j"], cmap="RdYlGn", vmin=0, vmax=10)
-    styled = styled.format(fmt)
+
+    styled = (
+        display.set_index("#")
+        .style.background_gradient(subset=["Score (/10)"], cmap="RdYlGn", vmin=0, vmax=10)
+        .background_gradient(subset=["Moy. 7j"], cmap="RdYlGn", vmin=0, vmax=10)
+        .format({"Score (/10)": "{:.1f}", "Moy. 7j": "{:.1f}", "Cours (€)": "{:.2f}"}, na_rep="—")
+    )
     st.dataframe(styled, use_container_width=True)
 
 
@@ -796,10 +794,9 @@ def main() -> None:
         df_articles = load_article_sentiments()
 
     if not df_stocks.empty:
-        sort_cols = ["score_technique"]
-        if "score_7d_avg" in df_stocks.columns:
-            sort_cols.append("score_7d_avg")
-        df_stocks = df_stocks.sort_values(sort_cols, ascending=False).reset_index(drop=True)
+        df_stocks = df_stocks.sort_values(
+            ["score_technique", "score_7d_avg"], ascending=False
+        ).reset_index(drop=True)
 
     if not df_composite.empty:
         render_global_kpis(df_composite)
