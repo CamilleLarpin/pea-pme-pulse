@@ -35,3 +35,7 @@ nao_config.yaml
 
 # Streamlit
 .streamlit/secrets.toml
+
+# GCP credentials
+gcp-key.json
+*-key.json
