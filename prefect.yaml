@@ -137,7 +137,7 @@ deployments:
     version: "0.1.0"
     tags: ["silver", "amf", "insider"]
     description: "Silver amf insider signals — dbt clean + technical indicators. Triggered by bronze_amf_flux on completion."
-    entrypoint: src/flows/silver_amf_insider_signals.py:silver_amf_insider_signals_flow
+    entrypoint: src/flows/silver_insider_parser.py:amf_insider_parser_flow
     concurrency_limit: 1
     work_pool:
       name: pea-pme
@@ -147,7 +147,7 @@ deployments:
     version: "0.1.0"
     tags: ["gold", "amf", "insider"]
     description: "Gold amf insider signals — dbt clean + technical indicators. Triggered by silver-insider-signals on completion."
-    entrypoint: src/flows/gold_insider_signals.py:gold_insider_signals_flow
+    entrypoint: src/flows/gold_insider_signals.py:gold_insider_scoring_flow
     concurrency_limit: 1
     work_pool:
       name: pea-pme
