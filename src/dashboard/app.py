@@ -609,12 +609,17 @@ def render_ranking(df: pd.DataFrame) -> None:
         rename_map["score_7d_avg"] = "Moy. 7j"
     display = top10[cols].rename(columns=rename_map)
 
-    styled = (
-        display.set_index("#")
-        .style.background_gradient(subset=["Score (/10)"], cmap="RdYlGn", vmin=0, vmax=10)
-        .background_gradient(subset=["Moy. 7j"], cmap="RdYlGn", vmin=0, vmax=10)
-        .format({"Score (/10)": "{:.1f}", "Moy. 7j": "{:.1f}", "Cours (€)": "{:.2f}"})
+    display_indexed = display.set_index("#")
+    has_7d = "Moy. 7j" in display_indexed.columns
+    fmt = {"Score (/10)": "{:.1f}", "Cours (€)": "{:.2f}"}
+    if has_7d:
+        fmt["Moy. 7j"] = "{:.1f}"
+    styled = display_indexed.style.background_gradient(
+        subset=["Score (/10)"], cmap="RdYlGn", vmin=0, vmax=10
     )
+    if has_7d:
+        styled = styled.background_gradient(subset=["Moy. 7j"], cmap="RdYlGn", vmin=0, vmax=10)
+    styled = styled.format(fmt)
     st.dataframe(styled, use_container_width=True)
 
 
