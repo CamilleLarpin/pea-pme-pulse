@@ -788,9 +788,10 @@ def main() -> None:
         df_articles = load_article_sentiments()
 
     if not df_stocks.empty:
-        df_stocks = df_stocks.sort_values(
-            ["score_technique", "score_7d_avg"], ascending=False
-        ).reset_index(drop=True)
+        sort_cols = ["score_technique"]
+        if "score_7d_avg" in df_stocks.columns:
+            sort_cols.append("score_7d_avg")
+        df_stocks = df_stocks.sort_values(sort_cols, ascending=False).reset_index(drop=True)
 
     if not df_composite.empty:
         render_global_kpis(df_composite)
