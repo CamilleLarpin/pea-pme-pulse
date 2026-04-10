@@ -154,6 +154,15 @@ def dbt_run_gold() -> None:
 {extra}"""
     with tempfile.TemporaryDirectory() as profiles_dir:
         (Path(profiles_dir) / "profiles.yml").write_text(profiles)
+        deps_result = subprocess.run(
+            ["dbt", "deps", "--project-dir", str(DBT_PROJECT_DIR), "--profiles-dir", profiles_dir],
+            capture_output=True,
+            text=True,
+        )
+        logger.info("dbt deps stdout:\n%s", deps_result.stdout)
+        if deps_result.returncode != 0:
+            logger.error("dbt deps stderr:\n%s", deps_result.stderr)
+            raise RuntimeError(f"dbt deps failed (exit {deps_result.returncode})")
         result = subprocess.run(
             cmd + ["--profiles-dir", profiles_dir],
             capture_output=True,
