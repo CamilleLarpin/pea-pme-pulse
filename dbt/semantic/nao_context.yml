@@ -10,24 +10,42 @@ project:
   timezone: Europe/Paris
 
 tables:
-  - name: gold.score_news
+  - name: gold.company_scores
     keywords:
       - top companies
       - best score
       - worst score
-      - investment score
+      - overall score
+      - composite score
       - ranking
-      - news signal
       - which company
       - classement
       - meilleures entreprises
+      - score global
+      - score composite
     example_questions:
-      - "What are the top 10 companies by investment score today?"
+      - "What are the top 10 companies by composite score today?"
+      - "Which companies have a composite_score above 7?"
+      - "What is the overall score for Thermador Groupe?"
+      - "Show me the best companies across all signals"
+      - "Quelles sont les 5 meilleures entreprises selon le score composite ?"
+      - "Which company has the highest score_financials?"
+      - "Show companies where score_insider is above 8"
+
+  - name: gold.score_news
+    keywords:
+      - investment score
+      - news signal
+      - news score
+      - media coverage
+      - sentiment
+      - mention count
+      - actualités
+    example_questions:
       - "Which company has the strongest news signal this week?"
       - "Show me companies with investment_score >= 8"
-      - "What is the investment score for Thermador Groupe?"
       - "Which companies have the most media coverage in the last 45 days?"
-      - "Quelles sont les 5 meilleures entreprises selon le score d'investissement ?"
+      - "What is the news score for Thermador Groupe?"
 
   - name: gold.article_sentiment
     keywords:
@@ -48,12 +66,19 @@ tables:
 
 query_patterns:
   top_n_companies: >
-    SELECT matched_name, ticker_bourso, investment_score, mention_count_45d
-    FROM gold.score_news
-    ORDER BY investment_score DESC
+    SELECT name, ticker_bourso, composite_score, score_news, score_stock, score_insider, score_financials
+    FROM gold.company_scores
+    WHERE score_date = CURRENT_DATE('Europe/Paris')
+    ORDER BY composite_score DESC
     LIMIT <n>
 
   company_score_lookup: >
+    SELECT name, ticker_bourso, composite_score, score_news, score_stock, score_insider, score_financials, score_date
+    FROM gold.company_scores
+    WHERE score_date = CURRENT_DATE('Europe/Paris')
+      AND (name LIKE '%<company>%' OR ticker_bourso = '<ticker>')
+
+  news_score_lookup: >
     SELECT matched_name, investment_score, avg_sentiment_45d, mention_count_45d, score_date
     FROM gold.score_news
     WHERE matched_name LIKE '%<company>%' OR ticker_bourso = '<ticker>'
