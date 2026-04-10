@@ -28,7 +28,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from prefect import flow, get_run_logger, task
-
+from flows.utils.dbt import _run_dbt, _log_dbt_output, _base_dbt_cmd, _dbt_deps
 from silver.amf_financial_signal_extract import run_financial_signal_extract
 
 # ============================================================================
@@ -37,11 +37,9 @@ from silver.amf_financial_signal_extract import run_financial_signal_extract
 
 DBT_PROJECT_DIR = Path(__file__).parent.parent.parent / "dbt"
 
-
 # ============================================================================
 # Tasks
 # ============================================================================
-
 
 @task(
     name="amf-extract-financial-signals",
@@ -74,6 +72,7 @@ def dbt_run_amf_financial_signal(
     full_refresh: bool = False,
 ) -> None:
     logger = get_run_logger()
+    _dbt_deps()
 
     active_prompt_version = os.environ.get("AMF_ACTIVE_PROMPT_VERSION")
 
@@ -114,6 +113,7 @@ def dbt_run_amf_financial_signal(
 )
 def dbt_test_amf_financial_signal() -> None:
     logger = get_run_logger()
+    _dbt_deps()
 
     cmd = [
         "dbt",
