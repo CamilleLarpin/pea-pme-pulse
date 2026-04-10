@@ -15,9 +15,10 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from flows.bronze_amf_flux import amf_flux_flow
 from flows.silver_amf import amf_financial_signal_silver_flow
-from flows.utils.dbt import _run_dbt, _log_dbt_output, _base_dbt_cmd, _dbt_deps
+from flows.utils.dbt import _base_dbt_cmd, _dbt_deps, _log_dbt_output, _run_dbt
 
 DBT_PROJECT_DIR = Path(__file__).parent.parent.parent / "dbt"
+
 
 @task(name="dbt-run-financials-score", retries=1, retry_delay_seconds=30)
 def dbt_run_financials_score_task(full_refresh: bool = False) -> None:

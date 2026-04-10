@@ -64,10 +64,16 @@ def dbt_run_silver() -> None:
     with tempfile.TemporaryDirectory() as profiles_dir:
         (Path(profiles_dir) / "profiles.yml").write_text(profiles)
         result = subprocess.run(
-            ["dbt", "run",
-             "--select", "silver.rss_articles",
-             "--project-dir", str(DBT_PROJECT_DIR),
-             "--profiles-dir", profiles_dir],
+            [
+                "dbt",
+                "run",
+                "--select",
+                "silver.rss_articles",
+                "--project-dir",
+                str(DBT_PROJECT_DIR),
+                "--profiles-dir",
+                profiles_dir,
+            ],
             capture_output=True,
             text=True,
         )

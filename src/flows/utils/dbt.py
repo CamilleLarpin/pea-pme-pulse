@@ -18,21 +18,28 @@ def _log_dbt_output(logger, result: subprocess.CompletedProcess) -> None:
 
 def _base_dbt_cmd(subcommand: str, select: str) -> list[str]:
     cmd = [
-        "dbt", subcommand,
-        "--project-dir", str(DBT_PROJECT_DIR),
-        "--target", os.environ.get("DBT_TARGET", "prod"),
+        "dbt",
+        subcommand,
+        "--project-dir",
+        str(DBT_PROJECT_DIR),
+        "--target",
+        os.environ.get("DBT_TARGET", "prod"),
     ]
     if select:
         cmd += ["--select", select]
     return cmd
 
+
 def _dbt_deps() -> None:
     result = _run_dbt(_base_dbt_cmd("deps", ""))
     # deps n'a pas de --select donc on construit la commande manuellement
     cmd = [
-        "dbt", "deps",
-        "--project-dir", str(DBT_PROJECT_DIR),
-        "--target", os.environ.get("DBT_TARGET", "prod"),
+        "dbt",
+        "deps",
+        "--project-dir",
+        str(DBT_PROJECT_DIR),
+        "--target",
+        os.environ.get("DBT_TARGET", "prod"),
     ]
     result = _run_dbt(cmd)
     if result.returncode != 0:
