@@ -165,6 +165,7 @@ def render_sidebar() -> None:
 
 def render_freshness(
     df_composite: pd.DataFrame,
+    df_stocks: pd.DataFrame,
     df_news: pd.DataFrame,
     df_insider: pd.DataFrame,
     df_financials: pd.DataFrame,
@@ -172,6 +173,8 @@ def render_freshness(
     parts = []
     if not df_composite.empty and "score_date" in df_composite.columns:
         parts.append(f"**Composite** {df_composite['score_date'].max()}")
+    if not df_stocks.empty and "date" in df_stocks.columns:
+        parts.append(f"**Technique** {df_stocks['date'].max()}")
     if not df_news.empty and "score_date" in df_news.columns:
         parts.append(f"**Actualités** {df_news['score_date'].max()}")
     if not df_insider.empty and "signal_date" in df_insider.columns:
@@ -181,7 +184,7 @@ def render_freshness(
             f"**Fondamentaux** {df_financials['date_cloture_exercice'].max()} (dernière clôture)"
         )
     if parts:
-        st.caption("Données au : " + " · ".join(parts))
+        st.caption("Dernière mise à jour — " + " · ".join(parts))
 
 
 # ── Global KPIs (composite) ───────────────────────────────────────────────────
@@ -255,10 +258,11 @@ def render_composite_tab(df: pd.DataFrame) -> None:
     st.dataframe(styled, use_container_width=True)
 
     st.divider()
-    col_hist, col_radar = st.columns([2, 1])
+    col_hist, col_radar = st.columns(2)
 
     with col_hist:
         st.subheader("Distribution des scores composites")
+        st.caption("Répartition des PME selon leur score composite du jour.")
         fig_hist = px.histogram(
             df,
             x="composite_score",
@@ -293,7 +297,7 @@ def render_composite_tab(df: pd.DataFrame) -> None:
             annotation_text="Opportunité",
             annotation_position="top left",
         )
-        fig_hist.update_layout(height=300, bargap=0.05)
+        fig_hist.update_layout(height=380, bargap=0.05)
         st.plotly_chart(
             fig_hist,
             use_container_width=True,
@@ -593,18 +597,17 @@ def render_ranking(df: pd.DataFrame) -> None:
         top10[SIGNAL_LABELS[col]] = top10[col].map(SIGNAL_EMOJI)
 
     signal_label_cols = list(SIGNAL_LABELS.values())
-    display = top10[
-        ["#", "company_name", "date", "score_technique", "score_7d_avg", "Close"]
-        + signal_label_cols
-    ].rename(
-        columns={
-            "company_name": "Entreprise",
-            "date": "Date du score",
-            "score_technique": "Score (/10)",
-            "score_7d_avg": "Moy. 7j",
-            "Close": "Cours (€)",
-        }
-    )
+    cols = ["#", "company_name", "date", "score_technique", "Close"] + signal_label_cols
+    rename_map = {
+        "company_name": "Entreprise",
+        "date": "Date du score",
+        "score_technique": "Score (/10)",
+        "Close": "Cours (€)",
+    }
+    if "score_7d_avg" in top10.columns:
+        cols.insert(4, "score_7d_avg")
+        rename_map["score_7d_avg"] = "Moy. 7j"
+    display = top10[cols].rename(columns=rename_map)
 
     styled = (
         display.set_index("#")
@@ -795,7 +798,7 @@ def main() -> None:
 
     if not df_composite.empty:
         render_global_kpis(df_composite)
-        render_freshness(df_composite, df_news, df_insider, df_financials)
+        render_freshness(df_composite, df_stocks, df_news, df_insider, df_financials)
         st.divider()
 
     tab_A, tab_B, tab_C, tab_D = st.tabs(
