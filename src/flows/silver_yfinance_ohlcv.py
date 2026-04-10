@@ -46,12 +46,13 @@ def dbt_deps() -> None:
 
 
 @task(name="dbt-run-yahoo-ohlcv-clean", retries=1, retry_delay_seconds=60)
-def dbt_run_yahoo_ohlcv_clean() -> None:
+def dbt_run_yahoo_ohlcv_clean(full_refresh: bool = False) -> None:
     """
-    Matérialise silver.yahoo_ohlcv_clean via dbt.
+    Matérialise silver.yahoo_ohlcv_clean via dbt (insert_overwrite, monthly partition).
 
-    Déduplique bronze.yfinance_ohlcv par (isin, Date), filtre les cours
-    invalides et les séances incomplètes, et ajoute last_trading_date.
+    Déduplique bronze.yfinance_ohlcv par (isin, Date) et filtre les cours invalides.
+    En mode incremental, réécrit la partition du mois courant (+ mois précédent les 7
+    premiers jours du mois). Passer full_refresh=True pour recréer la table complète.
     """
     logger = get_run_logger()
     keyfile = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
@@ -64,6 +65,8 @@ def dbt_run_yahoo_ohlcv_clean() -> None:
         "--project-dir",
         str(DBT_PROJECT_DIR),
     ]
+    if full_refresh:
+        cmd.append("--full-refresh")
 
     method = "service-account" if keyfile else "oauth"
     extra = f"      keyfile: {keyfile}\n" if keyfile else ""
@@ -158,11 +161,11 @@ def dbt_run_stocks_score() -> None:
 
 
 @flow(name="silver-yfinance-ohlcv")
-def silver_yfinance_ohlcv_flow() -> None:
+def silver_yfinance_ohlcv_flow(full_refresh: bool = False) -> None:
     logger = get_run_logger()
-    logger.info("Démarrage flow silver-yfinance-ohlcv")
+    logger.info("Démarrage flow silver-yfinance-ohlcv (full_refresh=%s)", full_refresh)
     dbt_deps()
-    dbt_run_yahoo_ohlcv_clean()
+    dbt_run_yahoo_ohlcv_clean(full_refresh)
     yfinance_silver_compute()
     dbt_run_stocks_score()
     logger.info("Flow silver-yfinance-ohlcv terminé")

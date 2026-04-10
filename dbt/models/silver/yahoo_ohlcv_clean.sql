@@ -1,17 +1,16 @@
 -- Silver: clean OHLCV data from Bronze yfinance ingestion
--- Incremental merge on (isin, Date) — only processes new Bronze rows each run.
+-- Incremental insert_overwrite on monthly Date partition (rolling month window).
+-- Avoids BigQuery MERGE CPU cost — replaces affected partition(s), no JOIN overhead.
 -- Transformations applied:
 --   1. Deduplication on (isin, Date) — keeps latest ingestion
 --   2. Filters invalid prices (Close <= 0 or Open <= 0)
 --   3. Filters incomplete sessions — excludes today if market not yet closed
---   4. Computes last_trading_date per ISIN (MAX(Date) window function)
 -- Dividends, Stock Splits, ingested_at are Bronze metadata — not propagated to Silver.
 
 {{ config(
     materialized='incremental',
-    unique_key=['isin', 'Date'],
-    incremental_strategy='merge',
-    on_schema_change='fail',
+    incremental_strategy='insert_overwrite',
+    on_schema_change='sync_all_columns',
     partition_by={'field': 'Date', 'data_type': 'date', 'granularity': 'month'},
     cluster_by=['isin'],
 ) }}
@@ -39,7 +38,10 @@ with raw as (
             date_sub(current_date('Europe/Paris'), interval 1 day)
         )
         {% if is_incremental() %}
-        and ingested_at > (select max(ingested_at) from {{ this }})
+        -- Rewrite from the 1st of the rolling month:
+        --   days 1–7 of month → also covers previous month (handles late bronze arrivals)
+        --   days 8+ of month  → current month only (single partition rewritten)
+        and Date >= date_trunc(date_sub(current_date('Europe/Paris'), interval 7 day), month)
         {% endif %}
 ),
 
@@ -60,6 +62,5 @@ select
     Close,
     Volume,
     isin,
-    yf_ticker,
-    max(Date) over (partition by isin) as last_trading_date
+    yf_ticker
 from deduped

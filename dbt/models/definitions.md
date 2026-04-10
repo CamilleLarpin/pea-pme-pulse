@@ -78,10 +78,6 @@ Fuzzy match confidence score (0–100) produced by rapidfuzz when matching the a
 Identifier of the specific Google News RSS feed the article was fetched from. Values: euronext_growth | pme_bourse_fr. Not present in yahoo_rss (single feed source).
 {% enddocs %}
 
-{% docs last_trading_date %}
-Most recent trading date available for this ISIN in the Silver table — computed as MAX(Date) OVER (PARTITION BY isin). Identical for all rows of the same ISIN. Use this to filter for the latest closing price without a subquery: WHERE Date = last_trading_date. Also useful to detect stale ISINs (last_trading_date far behind CURRENT_DATE).
-{% enddocs %}
-
 {% docs RSI_14 %}
 Relative Strength Index over 14 trading days. Momentum oscillator in [0, 100]. Values below 30 indicate oversold conditions (potential buy signal); values above 70 indicate overbought conditions (potential sell signal). NaN for the first 14 rows of each ISIN (insufficient warmup). Computed via ta.momentum.RSIIndicator(close, window=14).
 {% enddocs %}
