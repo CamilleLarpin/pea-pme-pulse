@@ -5,9 +5,18 @@ from functools import lru_cache
 
 from fastapi import FastAPI, HTTPException, Query
 from google.cloud import bigquery
+from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel
 
 app = FastAPI(title="pea-pme-pulse API", version="0.1.0")
+
+Instrumentator().instrument(app).expose(app)
+
+
+@app.get("/health")
+def health():
+    return {"status": "ok", "timestamp": datetime.utcnow().isoformat()}
+
 
 GCP_PROJECT = os.environ.get("GCP_PROJECT_ID", "bootcamp-project-pea-pme")
 GOLD_DATASET = "gold"

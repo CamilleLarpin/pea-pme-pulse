@@ -39,3 +39,6 @@ nao_config.yaml
 # GCP credentials
 gcp-key.json
 *-key.json
+
+# Monitoring secrets
+infra/.env.monitoring

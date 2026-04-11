@@ -29,5 +29,29 @@ services:
       - prefect-server
     restart: unless-stopped
 
+  grafana:
+    image: grafana/grafana:latest
+    env_file: .env.monitoring
+    environment:
+      - GF_INSTALL_PLUGINS=grafana-bigquery-datasource
+      - GF_SERVER_ROOT_URL=http://35.241.252.5/grafana/
+      - GF_SERVER_SERVE_FROM_SUB_PATH=true
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
 volumes:
   prefect-db:
+  grafana-data:
+  prometheus-data:
