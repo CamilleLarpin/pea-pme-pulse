@@ -158,6 +158,10 @@ def render_sidebar() -> None:
 *⚠️ Informatif uniquement — pas un conseil en investissement.*
 """
         )
+        st.divider()
+        if st.button("🔄 Actualiser les données", use_container_width=True):
+            st.cache_data.clear()
+            st.rerun()
 
 
 # ── Data freshness ────────────────────────────────────────────────────────────

@@ -4193,6 +4193,22 @@ django = ["django"]
 twisted = ["twisted"]
 
 [[package]]
+name = "prometheus-fastapi-instrumentator"
+version = "6.1.0"
+description = "Instrument your FastAPI with Prometheus metrics."
+optional = false
+python-versions = ">=3.7.0,<4.0.0"
+groups = ["main"]
+files = [
+    {file = "prometheus_fastapi_instrumentator-6.1.0-py3-none-any.whl", hash = "sha256:2279ac1cf5b9566a4c3a07f78c9c5ee19648ed90976ab87d73d672abc1bfa017"},
+    {file = "prometheus_fastapi_instrumentator-6.1.0.tar.gz", hash = "sha256:1820d7a90389ce100f7d1285495ead388818ae0882e761c1f3e6e62a410bdf13"},
+]
+
+[package.dependencies]
+fastapi = ">=0.38.1,<1.0.0"
+prometheus-client = ">=0.8.0,<1.0.0"
+
+[[package]]
 name = "proto-plus"
 version = "1.27.2"
 description = "Beautiful, Pythonic protocol buffers"
@@ -6583,4 +6599,4 @@ dev = ["pytest", "pytest-mock", "ruff"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.11"
-content-hash = "1838f6e909e60f51126ff8f017726edbcfa11b6c9d638399b0f12dd76325e594"
+content-hash = "d34d2597055ed45a4ff9caf1f4714defdaab19b3ed5fd696be4c1c5270692fb8"
