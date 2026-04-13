@@ -364,3 +364,25 @@ It does not query BigQuery directly — all data comes through the API.
 Set `API_BASE_URL=http://35.241.252.5` in the deployment environment (Streamlit Cloud secrets
 or local `.env`).
 
+---
+
+## Monitoring — Prometheus + Grafana
+
+Prometheus and Grafana run as Docker services alongside Prefect (defined in
+`infra/docker-compose.prefect.yml`).
+
+**Prometheus** scrapes `/metrics` on `host.docker.internal:8000` every 30 seconds.
+`host.docker.internal` resolves to the VM host via the `extra_hosts` Docker setting, allowing
+the containerised Prometheus to reach the FastAPI service running outside Docker.
+
+**Grafana** is accessible at `http://35.241.252.5/grafana/`. The Prometheus datasource is
+auto-provisioned from `infra/grafana/provisioning/datasources/prometheus.yml`. Dashboard JSON
+files placed in `infra/grafana/dashboards/` are automatically loaded at startup via the provider
+config in `infra/grafana/provisioning/dashboards/provider.yml`.
+
+Key panels in the main dashboard:
+- **API Status** — `up{job="pea-pme-api"}` (stat, green/red)
+- **CPU / RAM VM** — Node Exporter metrics (gauge)
+- **Latence p95 par endpoint** — histogram_quantile(0.95, ...) per handler (time series)
+- **Taux erreur API** — rate of 5xx responses (stat)
+- **Fraîcheur pipeline** — BigQuery query returning last update date per Gold table
