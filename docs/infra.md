@@ -84,8 +84,7 @@ The server UI is at `http://35.241.252.5` (nginx basic auth, credentials in `.en
 |---|---|---|
 | `bronze-silver-rss` | Every 4h | cron `0 */4 * * *` |
 | `silver-gold-rss` | None | triggered by `bronze-silver-rss` on completion |
-| `bronze-yfinance-ohlcv` | Weekdays 19h30 | cron `30 19 * * 1-5` |
-| `silver-yfinance-ohlcv` | None | triggered by `bronze-yfinance-ohlcv` on completion |
+| `yfinance-ohlcv-pipeline` | Weekdays 19h30 | cron `30 19 * * 1-5` |
 | `bronze-abcbourse-rss` | Weekdays 08h | cron `0 8 * * 1-5` |
 | `bronze-amf` | Every 4h | cron `0 */4 * * *` |
 | `bronze-silver-gold-boursorama` | 1st of month 08h | cron `0 8 1 * *` |
@@ -128,10 +127,12 @@ gcloud auth application-default login
 - No `GOOGLE_APPLICATION_CREDENTIALS` env var needed in production flows
 - If GCP access breaks, it's an IAM permissions issue on the SA, not a key rotation issue
 
-**One exception — `silver-yfinance-ohlcv`**
-This flow was written before the VM migration. It still injects a JSON SA key via a Prefect Secret
-block (`gcp-sa-key`). That key has since been revoked (all user-managed SA keys were deleted
-2026-04-08). This flow needs to be updated to use ADC like all other flows. See below.
+**Historical exception — `silver-yfinance-ohlcv` (replaced)**
+This flow was written before the VM migration and injected a JSON SA key via a Prefect Secret
+block (`gcp-sa-key`). That key was revoked on 2026-04-08 when all user-managed SA keys were
+deleted. The flow has since been superseded by `yfinance-ohlcv-pipeline`, which uses ADC like
+all other production flows. The old deployments (`bronze-yfinance-ohlcv`, `silver-yfinance-ohlcv`)
+have been removed from Prefect.
 
 ---
 
@@ -155,7 +156,7 @@ Current secret blocks:
 | Block name | Injected as | Used by |
 |---|---|---|
 | `groq-api-key` | `GROQ_API_KEY` | `silver-gold-rss` |
-| `gcp-sa-key` | `GOOGLE_APPLICATION_CREDENTIALS_JSON` | `silver-yfinance-ohlcv` (legacy — to be removed) |
+| `gcp-sa-key` | `GOOGLE_APPLICATION_CREDENTIALS_JSON` | legacy — revoked 2026-04-08, no longer used |
 
 To rotate a secret: update the value in the Prefect UI (Blocks section). No redeploy needed.
 
@@ -220,3 +221,168 @@ docker compose down -v && docker compose up -d
 # Then redeploy from your laptop
 prefect deploy --all
 ```
+
+---
+
+## yfinance OHLCV pipeline — how and why
+
+This section covers the market data pipeline: from raw price fetching to the final technical
+score in `gold.stocks_score`. It is the most data-intensive pipeline in the project and the one
+that runs on the tightest daily schedule (weekdays at 19h30, after market close).
+
+### Overview
+
+```
+yfinance (Python library)
+  → bronze.yfinance_ohlcv          raw OHLCV, 462 ISINs
+  → silver.yahoo_ohlcv_clean       deduplicated, validated (dbt)
+  → silver.yahoo_ohlcv             + 7 technical indicators (Python, library `ta`)
+  → gold.stocks_score              5 signals → score_technique [0–10] (dbt)
+  → gold.company_scores            composite refresh (dbt)
+```
+
+All five steps run sequentially inside a single Prefect deployment:
+`yfinance-ohlcv-pipeline` (`src/flows/yfinance_pipeline.py`).
+
+### Why schedule at 19h30?
+
+French markets (Euronext) close at 17h30 Paris time. yfinance typically has the closing price
+available 30–60 minutes after close. Scheduling at 19h30 gives a comfortable buffer and ensures
+the full session OHLCV row is available for all 462 ISINs before the pipeline runs.
+
+### Bronze — `bronze.yfinance_ohlcv`
+
+yfinance resolves ISINs to Yahoo Finance tickers via `referentiel/ticker_overrides.json` (manual
+overrides for tickers that yfinance cannot resolve automatically). The library fetches OHLCV
+history up to 20 years back on first run and incremental daily rows on subsequent runs.
+
+Rows are written with APPEND mode, keyed on `(isin, date)` — the Silver cleaning step handles
+deduplication, so the Bronze layer stays append-only and re-fetchable if needed.
+
+### Silver — `silver.yahoo_ohlcv_clean` (dbt)
+
+The dbt model deduplicates on `(isin, Date)`, filters out rows where the price is zero or null
+(data quality issues from yfinance), and adds a `last_trading_date` column. It is partitioned
+by month to keep query costs low when downstream models scan only recent dates.
+
+It supports `full_refresh` (passed as a dbt variable) to force a complete rebuild from Bronze
+when schema changes are needed.
+
+### Silver — `silver.yahoo_ohlcv` (Python, `src/silver/compute_silver.py`)
+
+The technical indicators cannot be computed in SQL — they require rolling window calculations
+over ordered time series per ISIN. The `ta` library (Technical Analysis library for Python)
+handles this, producing 7 indicators per ISIN:
+
+| Indicator | Why it is included |
+|---|---|
+| `RSI_14` | Measures momentum; identifies overbought/oversold conditions |
+| `MACD` + `MACD_signal` | Captures trend acceleration and direction changes |
+| `BB_upper` + `BB_lower` | Defines volatility bands; %B shows position within the band |
+| `SMA_50` + `SMA_200` | Used together for the Golden Cross signal (long-term trend) |
+| `EMA_20` | Short-term trend; faster than SMA, more reactive to recent price action |
+
+**Write strategy:** WRITE_TRUNCATE on the first ISIN processed, WRITE_APPEND on all subsequent
+ones. This rebuilds the table cleanly each run without requiring a DELETE/INSERT cycle.
+
+### Gold — `gold.stocks_score` (dbt)
+
+The dbt model converts the 7 continuous indicators into 5 discrete signals, each scored 0/1/2:
+
+| Signal | 2 pts (bullish) | 1 pt (neutral) | 0 pts (bearish) |
+|---|---|---|---|
+| RSI | RSI < 35 (oversold) | 35 ≤ RSI < 65 or NaN | RSI ≥ 65 (overbought) |
+| MACD | MACD > MACD_signal | NaN | MACD ≤ MACD_signal |
+| Golden Cross | SMA_50 > SMA_200 | NaN | SMA_50 ≤ SMA_200 |
+| Bollinger %B | %B < 0.2 (low band) | 0.2 ≤ %B ≤ 0.8 or NaN | %B > 0.8 (high band) |
+| EMA Trend | Close > EMA_20 | NaN | Close ≤ EMA_20 |
+
+`score_technique = sum of 5 signals ∈ [0, 10]`
+
+NaN values (not enough history for a signal to compute) default to 1 (neutral) rather than 0,
+so that companies with short data history are not penalised. The model also computes
+`score_7d_avg` (7-day moving average) and flags `is_latest = TRUE` for the most recent row per
+ISIN.
+
+### Why a concurrency limit of 1 on `yfinance-ohlcv-pipeline`?
+
+The Silver Python step writes using WRITE_TRUNCATE on the first ISIN and WRITE_APPEND on the
+rest. If two pipeline instances ran in parallel, the second WRITE_TRUNCATE would wipe the
+partial results of the first run. The concurrency limit of 1 prevents this.
+
+---
+
+## API — FastAPI (`src/api/main.py`)
+
+The API is a thin read layer that exposes Gold tables to the Streamlit dashboard. It runs as a
+`systemd` service (`pea-pme-api`) directly on the VM — not inside Docker — which keeps it
+independent from the Prefect container stack.
+
+**Service details:**
+- WorkingDirectory: `/home/mathias/pea-pme-pulse`
+- Python venv: `/home/mathias/api-venv/`
+- Port: `8000` (reached by nginx via the VM's internal IP `10.132.0.2`)
+
+nginx routes to the API using a regex location matching the known path prefixes
+(`gold`, `overview`, `health`, `metrics`, `docs`, `openapi.json`). All other requests go to
+the Prefect UI.
+
+**Design choices:**
+- A single BigQuery client instance is shared across all requests via `@lru_cache(maxsize=1)`,
+  avoiding a new connection on every call.
+- Each endpoint runs one parameterised BigQuery query and returns the result as JSON — no
+  business logic, no aggregation. All computation happened at pipeline time.
+- `/health` returns `{"status": "ok", "timestamp": ...}` for uptime monitoring.
+- `/metrics` is exposed by `prometheus-fastapi-instrumentator` (3-line setup) and scraped every
+  30 seconds by Prometheus. This gives request counts, error rates, and latency histograms per
+  endpoint without any manual instrumentation.
+
+```bash
+sudo systemctl status pea-pme-api
+sudo journalctl -u pea-pme-api -f
+```
+
+---
+
+## Dashboard — Streamlit (`src/dashboard/app.py`)
+
+The dashboard is a Streamlit app that calls the FastAPI endpoints above and renders the results.
+It does not query BigQuery directly — all data comes through the API.
+
+**Key design choices:**
+- `@st.cache_data(ttl=3600)` on every data loading function: data is fetched once per hour per
+  browser session. The "Actualiser les données" button in the sidebar calls
+  `st.cache_data.clear()` + `st.rerun()` to force an immediate refresh.
+- The API base URL is read from `st.secrets["api_base_url"]` → env `API_BASE_URL` → default
+  `http://localhost:8000`. This makes the app portable across local dev and the VM without
+  code changes.
+- Four tabs (Composite, Actualités, Insiders & Fondamentaux, Analyse Technique) map directly
+  to the four scoring dimensions. The Technical tab has three sub-tabs: ranking, signal heatmap,
+  and score history.
+
+**Connecting the app to the VM API:**
+Set `API_BASE_URL=http://35.241.252.5` in the deployment environment (Streamlit Cloud secrets
+or local `.env`).
+
+---
+
+## Monitoring — Prometheus + Grafana
+
+Prometheus and Grafana run as Docker services alongside Prefect (defined in
+`infra/docker-compose.prefect.yml`).
+
+**Prometheus** scrapes `/metrics` on `host.docker.internal:8000` every 30 seconds.
+`host.docker.internal` resolves to the VM host via the `extra_hosts` Docker setting, allowing
+the containerised Prometheus to reach the FastAPI service running outside Docker.
+
+**Grafana** is accessible at `http://35.241.252.5/grafana/`. The Prometheus datasource is
+auto-provisioned from `infra/grafana/provisioning/datasources/prometheus.yml`. Dashboard JSON
+files placed in `infra/grafana/dashboards/` are automatically loaded at startup via the provider
+config in `infra/grafana/provisioning/dashboards/provider.yml`.
+
+Key panels in the main dashboard:
+- **API Status** — `up{job="pea-pme-api"}` (stat, green/red)
+- **CPU / RAM VM** — Node Exporter metrics (gauge)
+- **Latence p95 par endpoint** — histogram_quantile(0.95, ...) per handler (time series)
+- **Taux erreur API** — rate of 5xx responses (stat)
+- **Fraîcheur pipeline** — BigQuery query returning last update date per Gold table

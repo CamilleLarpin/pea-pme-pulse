@@ -784,6 +784,10 @@ def main() -> None:
         layout="wide",
     )
 
+    if "launched" not in st.session_state:
+        st.session_state["launched"] = True
+        st.balloons()
+
     render_sidebar()
 
     st.title("📈 PEA-PME Pulse — Tableau de bord")
