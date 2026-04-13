@@ -239,8 +239,7 @@ The Prefect UI is at `http://35.241.252.5` (nginx basic auth, credentials in `.e
 |---|---|---|
 | `bronze-silver-rss` | Every 4h (`0 */4 * * *`) | Orchestrator: Yahoo + Google News → Silver dbt → Gold Groq scoring |
 | `silver-gold-rss` | None (manual or triggered) | Triggered by `bronze-silver-rss` on completion |
-| `bronze-yfinance-ohlcv` | Weekdays 19h30 (`30 19 * * 1-5`) | After market close, fetches daily OHLCV prices |
-| `silver-yfinance-ohlcv` | None (triggered) | Triggered by `bronze-yfinance-ohlcv` on completion |
+| `yfinance-ohlcv-pipeline` | Weekdays 19h30 (`30 19 * * 1-5`) | Full Bronze→Silver→Gold OHLCV pipeline, concurrency limit 1 |
 | `bronze-abcbourse-rss` | Weekdays 08h (`0 8 * * 1-5`) | Morning market open |
 | `amf-pipeline` | Bi-annually (`0 0 1 4,10 *`) | April 1st and October 1st — regulatory filing seasons |
 | `bronze-silver-gold-boursorama` | 1st of month 08h (`0 8 1 * *`) | Monthly referentiel refresh |
@@ -267,11 +266,9 @@ become a maintenance problem. Docker gives each service a clean, isolated enviro
 | `prefect-server` | `prefecthq/prefect:3-latest` | Runs the Prefect API + database + scheduler |
 | `prefect-worker` | `prefecthq/prefect:3-latest` | Picks up flow runs, clones repo, executes flows |
 | `nginx` | `nginx:alpine` | Reverse proxy on port 80 — routes `/api` to Prefect, `/dbt-docs` to static files, adds basic auth |
-| `fastapi` | `python:3.12-slim` | Runs the REST API on port 8000, serves Gold BigQuery data |
 
-**Important:** the `fastapi` service uses `network_mode: host` — it shares the VM's network
-directly rather than going through Docker's internal network. This is what makes it reachable
-at `http://35.241.252.5:8000` without any extra nginx routing for that port.
+**Note:** FastAPI does not run in Docker. It runs as a `systemd` service directly on the VM —
+see the FastAPI section below.
 
 The Prefect worker container does not run flow code directly inside its own image. Instead, it
 spawns a new process (process worker type), clones the repo, and runs the flow there. This is
@@ -306,8 +303,22 @@ FastAPI authenticates to BigQuery via ADC (the VM's service account).
 | `GET /gold/financials-score/latest` | Fundamental score per company (latest filing) |
 | `GET /gold/article-sentiment/latest` | Raw article sentiments, last 45 days, max 500 |
 
-**Status:** the FastAPI service is defined in `docker-compose.prefect.yml` but has not been
-started on the VM yet. Port 8000 is not responding. The dashboard is broken as a result.
+**How it runs:** FastAPI is deployed as a `systemd` service (`pea-pme-api`) directly on the VM,
+not in Docker. This keeps it independent from the Prefect container stack.
+- WorkingDirectory: `/home/mathias/pea-pme-pulse`
+- Python venv: `/home/mathias/api-venv/`
+- Port: `8000` (reached by nginx via the VM's internal IP `10.132.0.2`)
+
+nginx routes to FastAPI using a regex location matching the known path prefixes
+(`gold`, `overview`, `health`, `metrics`, `docs`, `openapi.json`).
+
+A shared `@lru_cache(maxsize=1)` BigQuery client instance is reused across requests.
+`/health` and `/metrics` (Prometheus) are exposed for monitoring.
+
+```bash
+sudo systemctl status pea-pme-api
+sudo journalctl -u pea-pme-api -f
+```
 
 ---
 
@@ -334,8 +345,8 @@ Gold data, caches responses for 1 hour (`@st.cache_data(ttl=3600)`), and renders
 The `api_base_url` (pointing to `http://35.241.252.5:8000`) is set as a Streamlit Cloud secret
 in the app's Advanced Settings — it is not in the repository.
 
-**Status:** broken. Every API call fails because FastAPI is not running. Will work automatically
-once FastAPI is started on the VM.
+The `api_base_url` (pointing to `http://35.241.252.5`) is set as a Streamlit Cloud secret
+in the app's Advanced Settings — it is not in the repository.
 
 ---
 
@@ -446,19 +457,57 @@ capture overnight news before the trading day.
 
 ---
 
-### yfinance OHLCV (`src/flows/bronze_yfinance_ohlcv.py`, weekdays 19h30)
+### yfinance OHLCV (`src/flows/yfinance_pipeline.py`, weekdays 19h30)
 
-**What's specific:** yfinance data is always re-fetchable (historical API, no ephemeral feeds),
-so there is no GCS dump step. The flow fetches daily OHLCV (Open, High, Low, Close, Volume) for
-all 462 ISINs in the referentiel that have a known Yahoo Finance ticker, then writes directly to
-`bronze.yfinance_ohlcv`. The 19h30 schedule is deliberate: French markets close at 17h30, so
-this runs after all daily prices are available.
+This single deployment (`yfinance-ohlcv-pipeline`) runs the full Bronze → Silver → Gold market
+data pipeline in sequence. A concurrency limit of 1 is enforced: the Silver write step uses
+WRITE_TRUNCATE on the first ISIN then WRITE_APPEND on the rest — a second parallel instance
+would corrupt the table by truncating partial results.
 
-The Silver step (`silver-yfinance-ohlcv`) is triggered on completion and runs three sub-steps in
-sequence: dbt deduplication → Python technical indicator computation (RSI, MACD, Bollinger,
-SMA, EMA) → dbt scoring. The Silver Python step is the only part of this pipeline that writes
-to BigQuery using Python (not dbt) at Silver layer — because computing rolling technical indicators
-in SQL is impractical.
+**Why 19h30?** French markets (Euronext) close at 17h30. yfinance has the closing price
+available ~30–60 minutes after close. 19h30 gives a safe buffer.
+
+**Why no GCS dump?** yfinance is a structured historical API — data is always re-fetchable.
+Unlike RSS feeds (ephemeral, 20-article window), there is no risk of losing data if the pipeline
+is delayed. GCS backup would add cost and complexity without benefit here.
+
+**Step by step:**
+
+1. `yfinance_ohlcv_flow` — fetches daily OHLCV for 462 ISINs via `yfinance`, writes to
+   `bronze.yfinance_ohlcv` (APPEND). ISINs are resolved to Yahoo Finance tickers via
+   `referentiel/ticker_overrides.json` (manual overrides for tickers yfinance cannot resolve).
+
+2. `dbt run silver.yahoo_ohlcv_clean` — deduplicates on `(isin, Date)`, filters zero/null
+   prices, adds `last_trading_date`. Partitioned by month to keep downstream query costs low.
+   Supports `full_refresh` to force a complete rebuild from Bronze.
+
+3. `yfinance_silver_compute` — computes 7 technical indicators per ISIN using the `ta` library
+   (rolling window calculations that cannot be expressed in SQL):
+
+   | Indicator | Role in scoring |
+   |---|---|
+   | `RSI_14` | Momentum — identifies oversold/overbought conditions |
+   | `MACD` + `MACD_signal` | Trend acceleration and direction changes |
+   | `BB_upper` + `BB_lower` | Volatility bands — %B position within the band |
+   | `SMA_50` + `SMA_200` | Long-term trend (Golden Cross signal) |
+   | `EMA_20` | Short-term trend, more reactive than SMA |
+
+4. `dbt run gold.stocks_score` — converts the 7 indicators into 5 discrete signals (0/1/2 pts
+   each), summed into `score_technique ∈ [0, 10]`:
+
+   | Signal | 2 pts (bullish) | 1 pt (neutral) | 0 pts (bearish) |
+   |---|---|---|---|
+   | RSI | < 35 (oversold) | 35–65 or NaN | ≥ 65 (overbought) |
+   | MACD | MACD > MACD_signal | NaN | MACD ≤ MACD_signal |
+   | Golden Cross | SMA_50 > SMA_200 | NaN | SMA_50 ≤ SMA_200 |
+   | Bollinger %B | %B < 0.2 | 0.2 ≤ %B ≤ 0.8 or NaN | %B > 0.8 |
+   | EMA Trend | Close > EMA_20 | NaN | Close ≤ EMA_20 |
+
+   NaN defaults to 1 (neutral) so companies with short history are not penalised. The model
+   also produces `score_7d_avg` (7-day moving average) and `is_latest = TRUE` for the most
+   recent row per ISIN.
+
+5. `dbt run gold.company_scores` — refreshes the composite score with the updated `score_stock`.
 
 ---
 
@@ -523,10 +572,10 @@ gcloud auth application-default login
 - No `GOOGLE_APPLICATION_CREDENTIALS` env var needed in production flows
 - If GCP access breaks, it's an IAM permissions issue on the SA, not a key rotation issue
 
-**One exception — `silver-yfinance-ohlcv`**
-This flow still injects a JSON SA key via a Prefect Secret block (`gcp-sa-key`). That key has
-been revoked (all user-managed SA keys were deleted 2026-04-08). This flow needs to be updated
-to use ADC like all other flows.
+**Historical exception — `silver-yfinance-ohlcv` (replaced)**
+This flow injected a JSON SA key via a Prefect Secret block (`gcp-sa-key`). That key was revoked
+on 2026-04-08. The flow has since been superseded by `yfinance-ohlcv-pipeline`, which uses ADC
+like all other production flows. The old deployments have been removed from Prefect.
 
 ---
 
@@ -550,7 +599,7 @@ Current secret blocks:
 | Block name | Injected as | Used by |
 |---|---|---|
 | `groq-api-key` | `GROQ_API_KEY` | `bronze-silver-rss`, `amf-pipeline` |
-| `gcp-sa-key` | `GOOGLE_APPLICATION_CREDENTIALS_JSON` | `silver-yfinance-ohlcv` (legacy — to be removed) |
+| `gcp-sa-key` | `GOOGLE_APPLICATION_CREDENTIALS_JSON` | legacy — revoked 2026-04-08, no longer used |
 
 To rotate a secret: update the value in the Prefect UI (Blocks section). No redeploy needed.
 
@@ -607,15 +656,6 @@ prefect deploy --all
 1. Prefect UI → Blocks → `groq-api-key` → edit value (takes effect on next run)
 2. Update `GROQ_API_KEY` in your local `.env`
 
-**Start FastAPI on the VM**
-```bash
-gcloud compute ssh prefect-server --zone=europe-west1-b --project=bootcamp-project-pea-pme
-cd ~/prefect
-git pull --rebase
-docker compose up -d fastapi
-curl http://localhost:8000/overview   # verify
-```
-
 **Nuclear reset (wipes all Prefect state — use only as last resort)**
 ```bash
 # On the VM
@@ -638,33 +678,54 @@ Consider adding a lightweight caching layer (e.g., Redis or a simple in-process 
 FastAPI) so repeated requests within a time window return a cached response. The Streamlit
 `@st.cache_data(ttl=3600)` helps at the browser level but not when multiple users hit the API.
 
-**2. The `silver-yfinance-ohlcv` ADC migration is a live reliability risk**
-The `gcp-sa-key` Prefect Secret block is referencing a revoked key. This flow will fail on its
-next run. It should be updated to use ADC (remove the key injection, switch to `method: oauth`
-in the dbt profile) before the next weekday 19h30 trigger.
-
-**3. No alerting on flow failures**
+**2. No alerting on flow failures**
 Currently, a failed flow is only visible if someone manually checks the Prefect UI. Add a
 Prefect notification block (Slack or email) to the critical flows (`bronze-silver-rss`,
 `bronze-yfinance-ohlcv`, `amf-pipeline`) so failures are surfaced proactively.
 
-**4. dbt docs are manually regenerated**
+**3. dbt docs are manually regenerated**
 The dbt docs site at `/dbt-docs` goes stale whenever a schema changes. Consider automating
 `dbt docs generate` as a post-deploy step in the Prefect `prefect.yaml` pull section, or
 running it as a dedicated scheduled deployment.
 
-**5. The Google News RSS loop is fragile at scale**
+**4. The Google News RSS loop is fragile at scale**
 One HTTP request per company (571 companies) in a single flow run is slow and brittle — one
 timeout crashes the whole batch. Consider chunking the company list and using Prefect's
 `submit()` for concurrent task execution, with per-company retries.
 
-**6. No data quality monitoring over time**
+**5. No data quality monitoring over time**
 dbt tests (`not_null`, `unique`) catch structural errors but do not catch business-level drift —
 e.g., a sudden drop in article volume could indicate the RSS source changed format without
 raising a dbt test error. Adding a simple row-count check per Bronze table (alert if < 10 rows
 after a run) would catch silent failures early.
 
-**7. nao context is not version-controlled alongside schema changes**
+**6. nao context is not version-controlled alongside schema changes**
 `dbt/semantic/nao_context.yml` is manually maintained. When a Gold column is renamed or a new
 table is added, nao context can drift silently. Consider adding a CI check that verifies all
 tables/columns referenced in `nao_context.yml` exist in the current dbt schema.
+
+---
+
+## Monitoring — Prometheus + Grafana
+
+Prometheus and Grafana run as Docker services alongside Prefect (defined in
+`infra/docker-compose.prefect.yml`).
+
+**Prometheus** scrapes `/metrics` on `host.docker.internal:8000` every 30 seconds.
+`host.docker.internal` resolves to the VM host via the `extra_hosts` Docker setting, allowing
+the containerised Prometheus to reach the FastAPI service running outside Docker.
+
+The FastAPI `/metrics` endpoint is exposed by `prometheus-fastapi-instrumentator` — it provides
+request counts, error rates, and latency histograms per endpoint with no manual instrumentation.
+
+**Grafana** is accessible at `http://35.241.252.5/grafana/`. The Prometheus datasource is
+auto-provisioned from `infra/grafana/provisioning/datasources/prometheus.yml`. Dashboard JSON
+files placed in `infra/grafana/dashboards/` are loaded automatically at startup via the provider
+config in `infra/grafana/provisioning/dashboards/provider.yml`.
+
+Key panels in the main dashboard:
+- **API Status** — `up{job="pea-pme-api"}` (stat, green/red)
+- **CPU / RAM VM** — Node Exporter metrics (gauge)
+- **Latence p95 par endpoint** — `histogram_quantile(0.95, ...)` per handler (time series)
+- **Taux erreur API** — rate of 5xx responses (stat)
+- **Fraîcheur pipeline** — BigQuery query returning last update date per Gold table
