@@ -40,9 +40,8 @@ insider as (
 
 financials as (
     -- Most recent fundamental score per isin
-    -- Source: BQ gold layer directly (fallback until PR #51 is merged as a dbt model)
     select isin, score_fondamental
-    from {{ source('gold', 'financials_score') }}
+    from {{ ref('financials_score') }}
     qualify row_number() over (partition by isin order by date_cloture_exercice desc) = 1
 )
 
