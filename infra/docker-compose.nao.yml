@@ -6,7 +6,7 @@ services:
     ports:
       - "5005:5005"
     environment:
-      - BETTER_AUTH_URL=http://35.241.252.5:5005
+      - BETTER_AUTH_URL=http://35.241.252.5/nao
     volumes:
       - ./nao_config.yaml:/workspace/nao_config.yaml:ro
       - nao-workspace:/workspace/data
