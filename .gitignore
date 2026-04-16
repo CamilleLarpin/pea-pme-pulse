@@ -33,6 +33,9 @@ logs/
 pea-pme-pulse/
 nao_config.yaml
 
+# Docs (certification reports — not versioned)
+docs/
+
 # Streamlit
 .streamlit/secrets.toml
 
