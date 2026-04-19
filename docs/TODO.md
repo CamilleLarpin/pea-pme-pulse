@@ -33,6 +33,8 @@
 
 ## Backlog
 
+- [ ] **Firewall GCP — fermer les ports inutiles** — ports 8000, 4200, 8001, 8080, 3389 ouverts directement sur internet · supprimer les règles : `allow-api-8000`, `allow-fastapi`, `allow-fastapi-8000`, `allow-fastapi-8001`, `allow-fastapi-8080`, `allow-fastapi-absolute`, `allow-prefect-ui`, `default-allow-rdp` · garder uniquement : 80, 22, 5005, icmp · **mettre à jour le rapport technique §5.1 et la section nginx** pour ne plus affirmer que le port 8000 est inaccessible depuis internet — *Camille*
+
 - [ ] Slack alert on new PR / commits (team coordination)
 - [ ] FastAPI Phase 2 — score endpoints (when more gold data accumulates)
 - [ ] `bronze.yahoo_rss` — 0 rows since 2026-03-31 · run manually once to confirm matching issue
