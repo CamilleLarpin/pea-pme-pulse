@@ -776,6 +776,7 @@ def build_llm_messages(document_text: str) -> list[dict[str, str]]:
     date_cloture_exercice_raw, ca_raw, ca_growth_raw, ebitda_raw, marge_op_raw, dette_nette_raw, fcf_raw
 
     DEFINITIONS:
+    - date_cloture_exercice_raw: date of fiscal year-end (e.g. "2023-12-31", "2023-06-30", "2023-09-30", "2023-03-31")
     - ca_raw: revenue/chiffre d'affaires/sales
     - ca_growth_raw: revenue growth %
     - ebitda_raw: EBITDA (not EBIT unless labeled EBITDA)

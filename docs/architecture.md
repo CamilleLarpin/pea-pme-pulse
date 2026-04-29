@@ -89,7 +89,7 @@ Flows live under `src/flows/` · deployment config in `prefect.yaml`.
 2. `compute_silver` (Python) — technical indicators → `silver.yahoo_ohlcv`
 3. `dbt run stocks_score` — scoring → `gold.stocks_score`
 
-Workspace: self-hosted Prefect server on GCP VM (`PREFECT_API_URL=http://35.241.252.5/api`)
+Workspace: self-hosted Prefect server on GCP VM (`PREFECT_API_URL=http://34.77.145.245/api`)
 
 Deploy:
 ```bash

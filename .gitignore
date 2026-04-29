@@ -20,6 +20,8 @@ Thumbs.db
 
 # Packaging
 pea_pme_pulse.egg-info/
+build/
+dist/
 data/
 
 # dbt

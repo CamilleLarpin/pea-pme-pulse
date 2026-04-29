@@ -73,6 +73,11 @@ class GcsArtifacts:
 
 
 def load_config() -> Config:
+    """Build configuration from environment variables.
+
+    Mandatory variables (GCP_PROJECT_ID, GCS_BUCKET_NAME) raise KeyError
+    if missing — fail fast rather than silent misconfiguration.
+    """
     return Config(
         project_id=os.environ["GCP_PROJECT_ID"],
         bucket_name=os.environ["GCS_BUCKET_NAME"],
@@ -115,19 +120,27 @@ BQ_SCHEMA: list[bigquery.SchemaField] = [
 
 
 def utc_now() -> datetime:
+    """Return current UTC datetime."""
     return datetime.now(UTC)
 
 
 def isoformat_utc(dt: datetime) -> str:
+    """Convert a datetime to a UTC ISO 8601 string."""
     return dt.astimezone(UTC).isoformat()
 
 
 def chunked(items: list[str], size: int) -> Iterator[list[str]]:
+    """Split a list into consecutive chunks of at most `size` elements."""
     for i in range(0, len(items), size):
         yield items[i : i + size]
 
 
 def build_requests_session() -> requests.Session:
+    """Build a requests Session with automatic retry on transient errors.
+
+    Retries up to 5 times with exponential backoff (factor 2) on HTTP
+    429/500/502/503/504. Respects Retry-After headers from the AMF API.
+    """
     retry = Retry(
         total=5,
         connect=5,
@@ -150,6 +163,14 @@ def build_requests_session() -> requests.Session:
 
 
 def parse_api_datetime(value: object) -> str | None:
+    """Parse an AMF API date string to a UTC ISO 8601 string.
+
+    Handles two formats returned by the API:
+    - ISO 8601 with optional trailing Z  (e.g. "2026-04-01T12:00:00Z")
+    - Date-only                          (e.g. "2026-04-01")
+
+    Returns None if the value is absent or unparseable.
+    """
     if value is None:
         return None
 
@@ -173,10 +194,16 @@ def parse_api_datetime(value: object) -> str | None:
 
 
 def validate_isin(value: str) -> bool:
+    """Return True if value matches the ISO 6166 ISIN format (12 alphanumeric chars)."""
     return bool(ISIN_REGEX.fullmatch(value.strip().upper()))
 
 
 def prepare_run_context(prefix: str = f"{DATA_SOURCE}_ingest_") -> RunContext:
+    """Create a unique run context with a timestamped run_id and a temp directory.
+
+    The temp directory holds the raw and clean JSONL files during the run.
+    It is cleaned up by cleanup_run_context() after GCS upload.
+    """
     run_id = utc_now().strftime("%Y-%m-%dT%H-%M-%SZ")
     tmp_dir = Path(tempfile.mkdtemp(prefix=prefix))
 
@@ -249,6 +276,11 @@ def load_targets(csv_path: str) -> dict[str, str | None]:
 
 
 def build_where_clause(isins: list[str]) -> str:
+    """Build the AMF API WHERE clause for a chunk of ISINs.
+
+    Each ISIN is validated before being quoted to prevent injection in the
+    API query string. Raises ValueError on any invalid ISIN.
+    """
     safe_isins = []
     for isin in isins:
         if not validate_isin(isin):
@@ -264,6 +296,11 @@ def fetch_export_jsonl(
     where_clause: str,
     timeout: int,
 ) -> requests.Response:
+    """Call the AMF JSONL export endpoint for a given WHERE clause.
+
+    Uses streaming to avoid loading the full response in memory.
+    Logs quota details on HTTP 429 before raising.
+    """
     params = {
         "select": ",".join(
             [
@@ -316,6 +353,11 @@ def build_clean_record(
     run_id: str,
     ingestion_ts: str,
 ) -> dict[str, object]:
+    """Map a raw AMF API record to the bronze.amf schema.
+
+    Renames verbose AMF field names to short snake_case equivalents and
+    enriches with ticker (from the referentiel), run_id, and ingestion_ts.
+    """
     return {
         "record_id": record.get("recordid"),
         "societe": record.get("identificationsociete_iso_nom_soc"),
@@ -337,6 +379,13 @@ def extract_data(
     config: Config,
     run_context: RunContext,
 ) -> ExtractionArtifacts:
+    """Fetch all AMF records for the referentiel ISINs and write them to local JSONL files.
+
+    ISINs are sent in chunks of config.chunk_size to stay within API limits.
+    Deduplication on record_id is performed in-memory during the stream to
+    avoid writing duplicate lines to the output files.
+    Both raw (original API fields) and clean (renamed, enriched) files are written.
+    """
     targets = load_targets(config.csv_path)
     isins = sorted(targets.keys())
 
@@ -438,6 +487,7 @@ def ensure_bucket_exists(
     bucket_name: str,
     location: str,
 ) -> storage.Bucket:
+    """Return the GCS bucket, creating it if it does not exist."""
     try:
         bucket = client.get_bucket(bucket_name)
         logger.info("Bucket already exists: {}", bucket_name)
@@ -455,6 +505,7 @@ def upload_to_gcs(
     destination_blob: str,
     location: str,
 ) -> str:
+    """Upload a local file to GCS and return its gs:// URI."""
     bucket = ensure_bucket_exists(client, bucket_name, location=location)
     blob = bucket.blob(destination_blob)
     blob.upload_from_filename(str(local_file))
@@ -466,6 +517,12 @@ def dump_gcs(
     config: Config,
     extraction: ExtractionArtifacts,
 ) -> GcsArtifacts:
+    """Upload raw and clean JSONL files to GCS under a run_id-partitioned path.
+
+    Path structure:
+        gs://<bucket>/amf/raw/run_id=<run_id>/amf_raw.jsonl
+        gs://<bucket>/amf/clean/run_id=<run_id>/amf_clean.jsonl
+    """
     storage_client = storage.Client(project=config.project_id)
 
     run_context = extraction.run_context
@@ -507,6 +564,10 @@ def dump_gcs(
 
 
 def extract_and_dump_gcs(*, config: Config) -> GcsArtifacts:
+    """Run the full extract-and-dump sequence: API fetch → local JSONL → GCS.
+
+    Cleans up the local temp directory on exit, whether successful or not.
+    """
     run_context = prepare_run_context()
 
     logger.info(
@@ -550,6 +611,7 @@ def ensure_dataset_exists(
     dataset_id: str,
     location: str,
 ) -> None:
+    """Create the BigQuery dataset if it does not already exist."""
     dataset_ref = bigquery.Dataset(f"{project_id}.{dataset_id}")
     dataset_ref.location = location
 
@@ -562,6 +624,11 @@ def ensure_dataset_exists(
 
 
 def ensure_table_exists(client: bigquery.Client, full_table_id: str) -> None:
+    """Create the bronze.amf table if it does not exist, or add missing columns.
+
+    The table is partitioned by month on publication_ts and clustered on
+    (isin, record_id) for efficient filtering by company and deduplication.
+    """
     try:
         table = client.get_table(full_table_id)
         logger.info("Table OK: {}", full_table_id)
@@ -590,6 +657,7 @@ def gcs_to_bq(
     write_disposition: str,
     schema: list[bigquery.SchemaField],
 ) -> None:
+    """Load a JSONL file from GCS into a BigQuery table. Blocks until complete."""
     job_config = bigquery.LoadJobConfig(
         source_format=bigquery.SourceFormat.NEWLINE_DELIMITED_JSON,
         write_disposition=write_disposition,
@@ -611,6 +679,12 @@ def inject_bq(
     config: Config,
     gcs_artifacts: GcsArtifacts,
 ) -> None:
+    """Load the clean GCS file into bronze.amf using a temp table + MERGE pattern.
+
+    The MERGE ensures idempotence: re-running the pipeline with the same data
+    updates existing rows instead of creating duplicates.
+    The temp table is deleted after the MERGE regardless of outcome.
+    """
     client = bigquery.Client(project=config.project_id)
 
     ensure_dataset_exists(
@@ -696,6 +770,7 @@ def inject_bq(
 
 
 def cleanup_local_files(*paths: Path) -> None:
+    """Delete local files, logging a warning on failure without raising."""
     for path in paths:
         try:
             if path.exists():
@@ -706,6 +781,7 @@ def cleanup_local_files(*paths: Path) -> None:
 
 
 def cleanup_run_context(run_context: RunContext) -> None:
+    """Remove all local files and the temp directory created for this run."""
     raw_output_path = Path(run_context.raw_output_path)
     clean_output_path = Path(run_context.clean_output_path)
     tmp_dir = Path(run_context.tmp_dir)
@@ -726,6 +802,7 @@ def cleanup_run_context(run_context: RunContext) -> None:
 
 
 def run_pipeline() -> None:
+    """Entry point: run the full AMF ingestion pipeline (extract → GCS → BigQuery)."""
     config = load_config()
     gcs_artifacts = extract_and_dump_gcs(config=config)
 

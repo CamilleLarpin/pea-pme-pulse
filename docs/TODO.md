@@ -16,7 +16,7 @@
 ## Urgent / Blockers
 
 - [ ] **`silver-yfinance-ohlcv` broken in prod** — still injects `GOOGLE_APPLICATION_CREDENTIALS_JSON` from Prefect Secret `gcp-sa-key`; that SA key was revoked 2026-04-08. Fix: remove `job_variables` from `prefect.yaml` for this flow + update dbt tasks to use `oauth` profile (same pattern as `gold_sentiment.py`) — *teammate*
-- [ ] **Teammates: update `.env`** — set `PREFECT_API_URL=http://35.241.252.5/api`, comment out `PREFECT_API_KEY` — *all*
+- [ ] **Teammates: update `.env`** — set `PREFECT_API_URL=http://34.77.145.245/api`, comment out `PREFECT_API_KEY` — *all*
 
 ---
 
@@ -43,7 +43,7 @@
 ## Done ✅
 
 - [x] Bronze → Silver → Gold end-to-end chain validated — auto-triggered every 4h
-- [x] Self-hosted Prefect on GCP VM — `http://35.241.252.5` · all 7 flows deployed
-- [x] nao Talk To My Data — deployed at `http://35.241.252.5:5005` · Gemini 2.5 Flash · always on
+- [x] Self-hosted Prefect on GCP VM — `http://34.77.145.245` · all 7 flows deployed
+- [x] nao Talk To My Data — deployed at `http://34.77.145.245:5005` · Gemini 2.5 Flash · always on
 - [x] `silver.companies` + `gold.company_scores` — Boursorama pipeline Bronze → Gold (PR #40)
 - [x] GCP SA key + Prefect Cloud API key rotated — 2026-04-08

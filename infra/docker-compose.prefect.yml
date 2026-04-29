@@ -3,7 +3,7 @@ services:
     image: prefecthq/prefect:3-latest
     command: prefect server start --host 0.0.0.0
     environment:
-      - PREFECT_UI_API_URL=http://35.241.252.5/api
+      - PREFECT_UI_API_URL=http://34.77.145.245/api
     volumes:
       - prefect-db:/root/.prefect
     restart: unless-stopped
@@ -34,7 +34,7 @@ services:
     working_dir: /app
     command: bash -c "pip install '.[dev]' -q && uvicorn src.api.main:app --host 0.0.0.0 --port 8000"
     volumes:
-      - /opt/pea-pme-pulse:/app
+      - /home/soratobiyufo/code/Ouffo/final_project/pea-pme-pulse:/app
     network_mode: host
     restart: unless-stopped
 

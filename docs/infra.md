@@ -59,7 +59,7 @@ There are two execution environments:
 Used for: writing code, running flows manually to test, deploying new configs, querying BigQuery.
 Nothing in production depends on your laptop being on.
 
-**GCP VM (`35.241.252.5`, zone `europe-west1-b`)**
+**GCP VM (`34.77.145.245`, zone `europe-west1-b`)**
 This is where all scheduled production pipelines run. It runs 24/7 and hosts:
 - the Prefect server (orchestration scheduler + database)
 - the Prefect worker (flow executor)
@@ -167,7 +167,7 @@ in SQL live in dbt. This gives three things you can't easily get with raw SQL sc
    These tests run automatically inside Prefect flows after each `dbt run`.
 
 3. **Documentation** — every table and column has a description in `dbt/models/`. The `dbt docs`
-   site (served by nginx at `http://35.241.252.5/dbt-docs`) lets you browse the full data
+   site (served by nginx at `http://34.77.145.245/dbt-docs`) lets you browse the full data
    dictionary without reading SQL files.
 
 **How dbt runs in this project:** dbt is not scheduled independently — it runs as a subprocess
@@ -231,7 +231,7 @@ Prefect server (VM) → schedule triggers run → worker (VM)
   → report result (success/failure + logs) back to server
 ```
 
-The Prefect UI is at `http://35.241.252.5` (nginx basic auth, credentials in `.env`).
+The Prefect UI is at `http://34.77.145.245` (nginx basic auth, credentials in `.env`).
 
 **Current deployments:**
 
@@ -342,17 +342,17 @@ Gold data, caches responses for 1 hour (`@st.cache_data(ttl=3600)`), and renders
 - Tab D — Analyse Technique: technical score ranking, signal heatmap (RSI/MACD/Golden Cross/
   Bollinger/EMA), score history charts for top 5
 
-The `api_base_url` (pointing to `http://35.241.252.5:8000`) is set as a Streamlit Cloud secret
+The `api_base_url` (pointing to `http://34.77.145.245:8000`) is set as a Streamlit Cloud secret
 in the app's Advanced Settings — it is not in the repository.
 
-The `api_base_url` (pointing to `http://35.241.252.5`) is set as a Streamlit Cloud secret
+The `api_base_url` (pointing to `http://34.77.145.245:8000`) is set as a Streamlit Cloud secret
 in the app's Advanced Settings — it is not in the repository.
 
 ---
 
 ### Prefect UI
 
-**What it is:** a web UI served by the Prefect server, accessible at `http://35.241.252.5`
+**What it is:** a web UI served by the Prefect server, accessible at `http://34.77.145.245`
 (protected by nginx basic auth).
 
 **Why it matters operationally:** this is where you go to:
@@ -377,12 +377,12 @@ If a flow goes red, start here. Expand the failed task to see the Python traceba
 faster than reading SQL. It tells you what each column means, where the data came from, and
 what tests are run on it.
 
-**Access:** `http://35.241.252.5/dbt-docs` — served as static files by nginx from
+**Access:** `http://34.77.145.245/dbt-docs` — served as static files by nginx from
 `/var/www/dbt-docs` on the VM. Regenerate after schema changes:
 
 ```bash
 cd dbt && dbt docs generate
-# Copy target/ to the VM: scp -r target/* user@35.241.252.5:/var/www/dbt-docs/
+# Copy target/ to the VM: scp -r target/* user@34.77.145.245:/var/www/dbt-docs/
 ```
 
 ---
@@ -587,7 +587,7 @@ Secrets never live in the code or in Git. Two locations:
 Used when running flows on your laptop. Copy `.env.example` and fill in real values.
 ```
 GROQ_API_KEY=...
-PREFECT_API_URL=http://35.241.252.5/api
+PREFECT_API_URL=http://34.77.145.245/api
 ```
 
 **Prefect Secret blocks (production)**
@@ -627,7 +627,7 @@ GCP auth at every step: ADC via the VM's attached SA. Groq auth: `GROQ_API_KEY` 
 ## How to operate the system
 
 **Check if flows are running**
-Open `http://35.241.252.5` → Flow Runs. Runs should appear every 4h for `bronze-silver-rss`.
+Open `http://34.77.145.245` → Flow Runs. Runs should appear every 4h for `bronze-silver-rss`.
 
 **SSH to the VM**
 ```bash
@@ -718,7 +718,7 @@ the containerised Prometheus to reach the FastAPI service running outside Docker
 The FastAPI `/metrics` endpoint is exposed by `prometheus-fastapi-instrumentator` — it provides
 request counts, error rates, and latency histograms per endpoint with no manual instrumentation.
 
-**Grafana** is accessible at `http://35.241.252.5/grafana/`. The Prometheus datasource is
+**Grafana** is accessible at `http://34.77.145.245/grafana/`. The Prometheus datasource is
 auto-provisioned from `infra/grafana/provisioning/datasources/prometheus.yml`. Dashboard JSON
 files placed in `infra/grafana/dashboards/` are loaded automatically at startup via the provider
 config in `infra/grafana/provisioning/dashboards/provider.yml`.
