@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Script présentation — Mathias</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    font-size: 13px;
+    color: #1a1a1a;
+    background: #fff;
+    padding: 24px;
+    max-width: 860px;
+    margin: 0 auto;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+
+  .slide {
+    border: 1px solid #d0d7de;
+    border-radius: 8px;
+    margin-bottom: 28px;
+    overflow: hidden;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  .slide-header {
+    background: #1a73e8;
+    color: white;
+    padding: 10px 16px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+
+  .slide-content {
+    background: #f6f8fa;
+    padding: 14px 18px;
+    border-bottom: 1px solid #d0d7de;
+  }
+
+  .slide-content h2 {
+    font-size: 15px;
+    color: #1a73e8;
+    margin-bottom: 8px;
+    line-height: 1.3;
+  }
+
+  .slide-content ul {
+    padding-left: 18px;
+    line-height: 1.75;
+  }
+
+  .slide-content li {
+    margin-bottom: 3px;
+  }
+
+  .slide-content table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    margin-top: 8px;
+    table-layout: fixed;
+  }
+
+  .slide-content th {
+    background: #e8f0fe;
+    color: #1a73e8;
+    padding: 6px 10px;
+    text-align: left;
+    font-weight: 600;
+    white-space: normal;
+  }
+
+  .slide-content td {
+    padding: 6px 10px;
+    border-bottom: 1px solid #e0e0e0;
+    vertical-align: top;
+    line-height: 1.5;
+  }
+
+  .slide-content tr:last-child td { border-bottom: none; }
+
+  .notes {
+    padding: 14px 18px;
+    background: #fff;
+  }
+
+  .notes-label {
+    font-size: 10px;
+    font-weight: 700;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+  }
+
+  .notes p {
+    line-height: 1.7;
+    color: #333;
+    margin-bottom: 8px;
+  }
+
+  .notes p:last-child { margin-bottom: 0; }
+
+  em { color: #555; font-style: italic; }
+
+  code {
+    background: #f0f0f0;
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-family: 'Consolas', monospace;
+    word-break: break-all;
+  }
+
+  .demo-path {
+    background: #fff8e1;
+    border-left: 3px solid #f9a825;
+    padding: 10px 14px;
+    margin-top: 8px;
+    border-radius: 0 4px 4px 0;
+    font-size: 12px;
+    line-height: 1.8;
+    white-space: normal;
+  }
+
+  .demo-path strong {
+    display: block;
+    color: #e65100;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+  }
+
+  .warn {
+    background: #fce4ec;
+    border-left: 3px solid #e53935;
+    padding: 7px 12px;
+    margin-top: 8px;
+    border-radius: 0 4px 4px 0;
+    font-size: 11px;
+    color: #b71c1c;
+    line-height: 1.5;
+  }
+
+  .warn strong { font-weight: 700; }
+
+  @media print {
+    body { padding: 12px; font-size: 12px; max-width: 100%; }
+    .slide { page-break-inside: avoid; break-inside: avoid; margin-bottom: 18px; }
+    code { font-size: 10px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- SLIDE 1 -->
+<div class="slide">
+  <div class="slide-header">Slide 1 — Mon flow (1 min)</div>
+  <div class="slide-content">
+    <h2>Mon flow — Données de prix boursiers</h2>
+    <ul>
+      <li>Chaque soir <strong>lundi–vendredi à 19h30</strong>, après la clôture des marchés</li>
+      <li><strong>462 sociétés</strong> françaises éligibles PEA-PME</li>
+      <li>Source : <strong>yfinance</strong> — bibliothèque Python, données Yahoo Finance gratuites</li>
+      <li>Données collectées : Ouverture · Plus haut · Plus bas · <strong>Clôture</strong> · Volume (OHLCV)</li>
+    </ul>
+  </div>
+  <div class="notes">
+    <div class="notes-label">À dire</div>
+    <p>« Mon rôle dans l'équipe c'était les données de prix. Chaque soir en semaine à 19h30 — juste après la clôture des marchés — un pipeline automatique va chercher les cours boursiers de 462 sociétés françaises via yfinance, une bibliothèque Python qui expose gratuitement les données Yahoo Finance. »</p>
+    <p>« On récupère ce qu'on appelle les données OHLCV : Ouverture, le cours le plus Haut, le plus Bas, la Clôture, et le Volume échangé. »</p>
+  </div>
+</div>
+
+<!-- SLIDE 2 -->
+<div class="slide">
+  <div class="slide-header">Slide 2 — Mon flow (suite)</div>
+  <div class="slide-content">
+    <h2>De la donnée brute au score technique</h2>
+    <table>
+      <tr><th>Étape</th><th>Ce qui se passe</th></tr>
+      <tr><td>🥉 Bronze</td><td>Stockage brut dans BigQuery — 462 ISINs, APPEND quotidien</td></tr>
+      <tr><td>🥈 Silver dbt</td><td>Nettoyage : dédoublonnage + validation OHLCV</td></tr>
+      <tr><td>🥈 Silver Python</td><td>7 indicateurs techniques (RSI, MACD, Bollinger, SMA 50/200, EMA)</td></tr>
+      <tr><td>🥇 Gold dbt</td><td>5 signaux haussier/neutre/baissier → score <strong>[0 – 10]</strong></td></tr>
+    </table>
+  </div>
+  <div class="notes">
+    <div class="notes-label">À dire</div>
+    <p>« Le pipeline suit l'architecture Medallion du projet. Bronze : on stocke brut. Premier Silver : un modèle dbt nettoie et dédoublonne — si une journée est déjà en base, on ne la réinsère pas. »</p>
+    <p>« Deuxième Silver : on calcule 7 indicateurs techniques avec la bibliothèque Python <code>ta</code> — le RSI mesure si une action est surachetée ou survendue, le MACD mesure le momentum, les moyennes mobiles 50 et 200 jours, les Bollinger Bands, et l'EMA 20 jours. »</p>
+    <p>« Gold : un modèle dbt traduit ces indicateurs en 5 signaux valant 0, 1 ou 2 points — score technique de 0 à 10. La séquence est critique : dbt clean → Python → dbt score. C'est Prefect qui orchestre ça. »</p>
+    <p><em>→ Transition : "Justement, parlons de Prefect et de l'infrastructure."</em></p>
+  </div>
+</div>
+
+<!-- SLIDE 3 -->
+<div class="slide">
+  <div class="slide-header">Slide 3 — Orchestration & infra (#4 — 2 min)</div>
+  <div class="slide-content">
+    <h2>Orchestration & infrastructure</h2>
+    <ul>
+      <li><strong>1 VM GCP</strong> e2-small — sobre, suffisante pour nos volumes</li>
+      <li><strong>Prefect 3</strong> auto-hébergé — chef d'orchestre des 10 pipelines</li>
+      <li><strong>Docker Compose</strong> — 5 services : Prefect server · worker · nginx · Grafana · Prometheus</li>
+      <li><strong>FastAPI</strong> tourne hors Docker (service systemd)</li>
+      <li><strong>Zéro clé secrète</strong> stockée — authentification via métadonnées GCP (ADC)</li>
+    </ul>
+  </div>
+  <div class="notes">
+    <div class="notes-label">À dire</div>
+    <p>« Tout tourne sur une seule machine virtuelle chez Google Cloud — une e2-small, configuration modeste mais suffisante pour nos volumes. »</p>
+    <p>« Prefect c'est notre chef d'orchestre : il planifie les pipelines, les lance au bon moment, les rejoue en cas d'échec. On l'héberge nous-mêmes plutôt que d'utiliser leur offre cloud payante. »</p>
+    <p>« Les services infrastructure tournent dans des containers Docker. L'API FastAPI, elle, tourne directement sur la machine via systemd — choix délibéré pour simplifier l'authentification Google Cloud. »</p>
+    <p>« Zéro fichier de clé secrète sur la machine — l'authentification GCP passe par les métadonnées de la VM, c'est le mécanisme ADC, Application Default Credentials. »</p>
+    <div class="warn"><strong>⚠ Ne pas dire :</strong> "FastAPI est dans Docker" — il tourne en systemd.</div>
+  </div>
+</div>
+
+<!-- SLIDE 4 -->
+<div class="slide">
+  <div class="slide-header">Slide 4 — Orchestration & infra (#4 — suite)</div>
+  <div class="slide-content">
+    <h2>Comment Prefect exécute les pipelines</h2>
+    <ul>
+      <li>À chaque déclenchement : <strong>clone du repo GitHub</strong> (branche <code>main</code>) + pip install</li>
+      <li>Pas d'image Docker par pipeline — simple et maintenable</li>
+      <li><strong>nginx</strong> aiguille les requêtes : Prefect UI · API FastAPI · Grafana</li>
+    </ul>
+    <table style="margin-top:10px">
+      <tr><th>Schedule</th><th>Pipeline</th></tr>
+      <tr><td>Lun–Ven <strong>19h30</strong></td><td><strong>yfinance OHLCV</strong> (mon pipeline)</td></tr>
+      <tr><td>Toutes les <strong>4h</strong></td><td>RSS actualités</td></tr>
+      <tr><td><strong>1er du mois</strong></td><td>Boursorama (référentiel)</td></tr>
+      <tr><td><strong>2x/an</strong></td><td>AMF fondamentaux (avril + octobre)</td></tr>
+    </table>
+  </div>
+  <div class="notes">
+    <div class="notes-label">À dire</div>
+    <p>« À chaque exécution, le worker Prefect télécharge la dernière version du code depuis GitHub et installe les dépendances. On n'a pas d'image Docker par pipeline — ça simplifie beaucoup la maintenance. »</p>
+    <p>« 10 pipelines avec des fréquences très différentes selon la nature des données : les cours boursiers tous les soirs, les actualités toutes les 4 heures, les fondamentaux seulement 2 fois par an quand les rapports AMF sortent. »</p>
+    <p><em>→ Transition : "Je vous montre tout ça en live dans Prefect."</em></p>
+  </div>
+</div>
+
+<!-- SLIDE 5 -->
+<div class="slide">
+  <div class="slide-header">Slide 5 — Prefect UI (#7 — 2 min)</div>
+  <div class="slide-content">
+    <h2>Prefect UI — Démonstration live</h2>
+    <ul>
+      <li><code>http://35.241.252.5/prefect</code></li>
+      <li><strong>Deployments</strong> → 10 pipelines, schedules visibles</li>
+      <li><strong>Flow Runs</strong> → historique, durée, état de chaque étape</li>
+      <li><strong>Work Pools</strong> → worker connecté en temps réel</li>
+    </ul>
+  </div>
+  <div class="notes">
+    <div class="notes-label">À dire</div>
+    <p>« Voici le centre de contrôle de tous nos pipelines. »</p>
+    <div class="demo-path">
+      <strong>Chemin de démo</strong>
+      1. Dashboard → derniers runs, succès en vert<br>
+      2. Deployments → liste des 10, montrer le schedule yfinance <code>30 19 * * 1-5</code><br>
+      3. Clic sur <code>yfinance-ohlcv-pipeline</code> → bouton Run manuel<br>
+      4. Flow Runs → historique, durées<br>
+      5. Clic sur un run récent → détail des 6 tasks dans l'ordre<br>
+      &nbsp;&nbsp;&nbsp;(bronze → dbt clean → Python indicators → dbt score → dbt company_scores)<br>
+      6. Work Pools → worker connecté
+    </div>
+    <p style="margin-top:10px">« Si un pipeline casse à 19h45, on voit exactement à quelle étape, avec les logs complets — sans avoir à se connecter en SSH sur la machine. »</p>
+    <p><em>→ Transition : "Le résultat de tout ça, c'est ce que les utilisateurs voient dans le dashboard."</em></p>
+  </div>
+</div>
+
+<!-- SLIDE 6 -->
+<div class="slide">
+  <div class="slide-header">Slide 6 — Streamlit (#5 — 2 min)</div>
+  <div class="slide-content">
+    <h2>Dashboard Streamlit</h2>
+    <ul>
+      <li>Interface de scoring des <strong>462 sociétés</strong> PEA-PME</li>
+      <li>Données via <strong>API FastAPI</strong> → cache 1h</li>
+      <li>Code couleur : 🟢 ≥ 6 &nbsp;·&nbsp; 🟡 4–6 &nbsp;·&nbsp; 🔴 &lt; 4</li>
+      <li><strong>4 onglets :</strong> Vue Composite · Actualités · Insiders & Fondamentaux · Analyse Technique</li>
+    </ul>
+  </div>
+  <div class="notes">
+    <div class="notes-label">À dire</div>
+    <p>« Tout ce qu'on vient de voir — les pipelines, les scores — c'est ici que ça devient visible et utilisable. Le dashboard consomme notre API FastAPI qui interroge BigQuery. »</p>
+    <p>« Les données sont mises en cache 1 heure pour ne pas surcharger BigQuery à chaque clic. Le bouton Actualiser vide ce cache. »</p>
+  </div>
+</div>
+
+<!-- SLIDE 7 -->
+<div class="slide">
+  <div class="slide-header">Slide 7 — Streamlit (#5 — suite, démo)</div>
+  <div class="slide-content">
+    <h2>Démonstration live — <code>http://35.241.252.5</code></h2>
+    <ul>
+      <li><strong>Vue Composite</strong> → classement 462 sociétés, radar chart Top 5</li>
+      <li><strong>Actualités</strong> → score de sentiment 45 jours, scatter volume/sentiment</li>
+      <li><strong>Insiders & Fondamentaux</strong> → transactions dirigeants, métriques AMF</li>
+      <li><strong>Analyse Technique</strong> → heatmap signaux, historique scores</li>
+    </ul>
+  </div>
+  <div class="notes">
+    <div class="notes-label">À dire</div>
+    <div class="demo-path">
+      <strong>Chemin de démo</strong>
+      1. Sidebar → légende couleurs, bouton Actualiser<br>
+      2. Tab Composite → Top 25, radar chart Top 5<br>
+      &nbsp;&nbsp;&nbsp;"Score composite = synthèse égale des 4 dimensions, 25% chacune."<br>
+      3. Tab Actualités → scatter volume/sentiment<br>
+      &nbsp;&nbsp;&nbsp;"Le score news est un rang relatif — pas une transformation directe du sentiment moyen."<br>
+      4. Tab Insiders → achats dirigeants<br>
+      &nbsp;&nbsp;&nbsp;"Quand un PDG rachète ses propres actions, c'est en général un signal positif."<br>
+      5. Tab Technique → heatmap RSI/MACD/etc.<br>
+      &nbsp;&nbsp;&nbsp;"C'est la vue issue directement de mon pipeline."
+    </div>
+    <div class="warn" style="margin-top:8px"><strong>⚠ Ne pas dire :</strong> "35% technique, 25% news..." — le score composite utilise <strong>25% × 4</strong>.</div>
+  </div>
+</div>
+
+<!-- SLIDE 8 -->
+<div class="slide">
+  <div class="slide-header">Slide 8 — Monitoring (30 sec)</div>
+  <div class="slide-content">
+    <h2>Monitoring — Prometheus & Grafana</h2>
+    <ul>
+      <li>FastAPI expose <code>/metrics</code> : latence · erreurs · volume de requêtes</li>
+      <li><strong>Prometheus</strong> collecte toutes les <strong>30 secondes</strong></li>
+      <li><strong>Grafana</strong> : API status · CPU/RAM VM · fraîcheur des données · runs Prefect</li>
+      <li>Branche <code>feat/monitoring-grafana</code> — <strong>merge imminent</strong></li>
+    </ul>
+  </div>
+  <div class="notes">
+    <div class="notes-label">À dire</div>
+    <p>« En bonus, j'ai mis en place un monitoring. L'API expose ses métriques — temps de réponse, taux d'erreurs — que Prometheus collecte toutes les 30 secondes. Grafana visualise ça : est-ce que l'API répond ? La VM sature-t-elle ? Depuis quand les données n'ont pas été mises à jour ? »</p>
+    <p>« C'est dans une PR qui sera mergée juste après la présentation. »</p>
+  </div>
+</div>
+
+</body>
+</html>
