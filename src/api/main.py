@@ -3,14 +3,32 @@ import re
 from datetime import date, datetime
 from functools import lru_cache
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query, Security
+from fastapi.security.api_key import APIKeyHeader
 from google.cloud import bigquery
 from pydantic import BaseModel
 
-app = FastAPI(title="pea-pme-pulse API", version="0.1.0")
-
 GCP_PROJECT = os.environ.get("GCP_PROJECT_ID", "bootcamp-project-pea-pme")
 GOLD_DATASET = "gold"
+
+# ── API Key authentication ────────────────────────────────────────────────────
+
+_API_KEY = os.environ.get("API_KEY")
+_api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+
+
+def require_api_key(key: str | None = Security(_api_key_header)) -> None:  # noqa: B008
+    if not _API_KEY:
+        raise HTTPException(status_code=500, detail="API_KEY not configured on server")
+    if key != _API_KEY:
+        raise HTTPException(status_code=403, detail="Invalid or missing API key")
+
+
+app = FastAPI(
+    title="pea-pme-pulse API",
+    version="0.1.0",
+    dependencies=[Depends(require_api_key)],
+)
 
 
 @lru_cache(maxsize=1)
