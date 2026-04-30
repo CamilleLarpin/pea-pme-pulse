@@ -38,7 +38,7 @@ from ta.volatility import BollingerBands
 # Configuration
 # ---------------------------------------------------------------------------
 
-GCP_PROJECT_ID = "bootcamp-project-pea-pme"
+GCP_PROJECT_ID = "arched-run-488313-h2"
 
 BQ_BRONZE_TABLE = f"{GCP_PROJECT_ID}.silver.yahoo_ohlcv_clean"
 BQ_SILVER_TABLE = f"{GCP_PROJECT_ID}.silver.yahoo_ohlcv"

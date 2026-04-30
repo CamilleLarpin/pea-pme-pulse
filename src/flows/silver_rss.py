@@ -22,7 +22,7 @@ from flows.bronze_yahoo_rss import yahoo_rss_flow  # noqa: E402
 from flows.gold_sentiment import silver_gold_rss_flow  # noqa: E402
 
 DBT_PROJECT_DIR = Path(__file__).parent.parent.parent / "dbt"
-GCP_PROJECT = "bootcamp-project-pea-pme"
+GCP_PROJECT = "arched-run-488313-h2"
 
 
 @task(name="dbt-deps")

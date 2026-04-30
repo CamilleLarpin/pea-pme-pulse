@@ -6,7 +6,7 @@ version: 2
 
 sources:
   - name: work
-    database: bootcamp-project-pea-pme
+    database: arched-run-488313-h2
     schema: work
     tables:
       - name: amf_financial_signal_staging
@@ -22,7 +22,7 @@ sources:
             description: "Timestamp when the extraction row was produced."
 
   - name: bronze
-    database: bootcamp-project-pea-pme
+    database: arched-run-488313-h2
     schema: bronze
     tables:
       - name: yahoo_rss
@@ -184,7 +184,7 @@ sources:
             description: "{{ doc('fetched_at') }}"
 
   - name: silver
-    database: bootcamp-project-pea-pme
+    database: arched-run-488313-h2
     schema: silver
     tables:
       - name: yahoo_ohlcv
@@ -269,7 +269,7 @@ sources:
           - name: processed_at
             description: "UTC timestamp indicating when the record was processed and inserted into the Silver layer."
   - name: gold
-    database: bootcamp-project-pea-pme
+    database: arched-run-488313-h2
     schema: gold
     tables:
       - name: article_sentiment

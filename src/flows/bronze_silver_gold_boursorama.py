@@ -26,7 +26,7 @@ if _gcp_creds_json and not os.environ.get("GOOGLE_APPLICATION_CREDENTIALS"):
 from flows.bronze_boursorama import bronze_boursorama_flow  # noqa: E402
 
 DBT_PROJECT_DIR = Path(__file__).parent.parent.parent / "dbt"
-GCP_PROJECT = "bootcamp-project-pea-pme"
+GCP_PROJECT = "arched-run-488313-h2"
 
 
 def _build_profiles(method: str, keyfile: str | None) -> str:

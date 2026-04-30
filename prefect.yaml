@@ -11,7 +11,7 @@ push: null
 pull:
   - prefect.deployments.steps.git_clone:
       id: git_clone
-      repository: https://github.com/CamilleLarpin/pea-pme-pulse.git
+      repository: https://github.com/Ouffo/pea-pme-pulse.git
       branch: main
   - prefect.deployments.steps.run_shell_script:
       script: flock /tmp/pip-install.lock pip install ".[dev]"
@@ -89,8 +89,8 @@ deployments:
       work_queue_name: default
       job_variables:
         env:
-          GCP_PROJECT_ID: "bootcamp-project-pea-pme"
-          GCS_BUCKET_NAME: "project-pea-pme"
+          GCP_PROJECT_ID: "arched-run-488313-h2"
+          GCS_BUCKET_NAME: "pea-pme-yf"
           AMF_ACTIVE_PROMPT_VERSION: "v5"
           GROQ_API_KEY: "{{ prefect.blocks.secret.groq-api-key }}"
 
@@ -108,8 +108,8 @@ deployments:
       job_variables:
         env:
           GCS_SOURCE_REFERENTIEL: "referentiel/boursorama_peapme_final.csv"
-          GCP_PROJECT_ID: "bootcamp-project-pea-pme"
-          GCS_BUCKET_NAME: "project-pea-pme"
+          GCP_PROJECT_ID: "arched-run-488313-h2"
+          GCS_BUCKET_NAME: "pea-pme-yf"
           BQ_DATASET_BRONZE: "bronze"
 
   - name: bronze-silver-gold-boursorama
