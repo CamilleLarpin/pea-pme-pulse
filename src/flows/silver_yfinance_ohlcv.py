@@ -26,7 +26,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 from prefect import flow, get_run_logger, task
 
 DBT_PROJECT_DIR = Path(__file__).parent.parent.parent / "dbt"
-GCP_PROJECT = "bootcamp-project-pea-pme"
+GCP_PROJECT = "arched-run-488313-h2"
 
 
 @task(name="dbt-deps")

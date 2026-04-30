@@ -38,7 +38,7 @@ ROOT = Path(__file__).parents[2]
 REFERENTIEL_PATH = ROOT / "referentiel" / "boursorama_peapme_final.csv"
 OVERRIDES_PATH = ROOT / "referentiel" / "ticker_overrides.json"
 
-GCP_PROJECT_ID = "bootcamp-project-pea-pme"
+GCP_PROJECT_ID = "arched-run-488313-h2"
 BQ_DATASET = "bronze"
 BQ_TABLE = "yfinance_ohlcv"
 BQ_TABLE_REF = f"{GCP_PROJECT_ID}.{BQ_DATASET}.{BQ_TABLE}"

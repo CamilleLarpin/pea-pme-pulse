@@ -13,11 +13,11 @@ from bronze.fuzzy_match import match_companies
 # TODO: verify exact URL with team before production
 FEED_URL = "https://fr.finance.yahoo.com/news/rssindex"
 
-BQ_PROJECT = "bootcamp-project-pea-pme"
+BQ_PROJECT = "arched-run-488313-h2"
 BQ_DATASET = "bronze"
 BQ_TABLE = "yahoo_rss"
 
-GCS_BUCKET = "project-pea-pme"
+GCS_BUCKET = "pea-pme-yf"
 GCS_PREFIX = "rss_yahoo"
 
 

@@ -27,7 +27,7 @@ MARKET = "PEAPME"
 LETTERS = list("ABCDEFGHIJKLMNOPQRSTUVWXYZ") + ["0"]
 DELAY_SECONDS = 0.3
 
-GCS_BUCKET = "project-pea-pme"
+GCS_BUCKET = "pea-pme-yf"
 GCS_OBJECT = "boursorama_peapme_final.csv"
 
 HEADERS = {

@@ -38,12 +38,21 @@ def get_api_base_url() -> str:
     return url or os.environ.get("API_BASE_URL", "http://localhost:8000")
 
 
+def _api_headers() -> dict[str, str]:
+    try:
+        key = st.secrets.get("api_key")
+    except Exception:
+        key = None
+    key = key or os.environ.get("API_KEY")
+    return {"X-API-Key": key} if key else {}
+
+
 # ── Data loading ──────────────────────────────────────────────────────────────
 
 
 @st.cache_data(ttl=3600)
 def load_latest_scores() -> pd.DataFrame:
-    resp = requests.get(f"{get_api_base_url()}/gold/stocks-score/latest", timeout=120)
+    resp = requests.get(f"{get_api_base_url()}/gold/stocks-score/latest", headers=_api_headers(), timeout=120)
     resp.raise_for_status()
     df = pd.DataFrame(resp.json())
     df = df.rename(columns={"close": "Close"})
@@ -54,6 +63,7 @@ def load_latest_scores() -> pd.DataFrame:
 def load_score_history(isins: tuple[str, ...], days: int) -> pd.DataFrame:
     resp = requests.get(
         f"{get_api_base_url()}/gold/stocks-score/history",
+        headers=_api_headers(),
         params={"isins": list(isins), "days": days},
         timeout=120,
     )
@@ -64,7 +74,7 @@ def load_score_history(isins: tuple[str, ...], days: int) -> pd.DataFrame:
 @st.cache_data(ttl=3600)
 def load_company_scores() -> pd.DataFrame:
     try:
-        resp = requests.get(f"{get_api_base_url()}/gold/company-scores/latest", timeout=120)
+        resp = requests.get(f"{get_api_base_url()}/gold/company-scores/latest", headers=_api_headers(), timeout=120)
         resp.raise_for_status()
         return pd.DataFrame(resp.json())
     except Exception:
@@ -74,7 +84,7 @@ def load_company_scores() -> pd.DataFrame:
 @st.cache_data(ttl=3600)
 def load_news_scores() -> pd.DataFrame:
     try:
-        resp = requests.get(f"{get_api_base_url()}/gold/score-news/latest", timeout=120)
+        resp = requests.get(f"{get_api_base_url()}/gold/score-news/latest", headers=_api_headers(), timeout=120)
         resp.raise_for_status()
         return pd.DataFrame(resp.json())
     except Exception:
@@ -84,7 +94,7 @@ def load_news_scores() -> pd.DataFrame:
 @st.cache_data(ttl=3600)
 def load_insider_scores() -> pd.DataFrame:
     try:
-        resp = requests.get(f"{get_api_base_url()}/gold/score-insider/latest", timeout=120)
+        resp = requests.get(f"{get_api_base_url()}/gold/score-insider/latest", headers=_api_headers(), timeout=120)
         resp.raise_for_status()
         return pd.DataFrame(resp.json())
     except Exception:
@@ -94,7 +104,7 @@ def load_insider_scores() -> pd.DataFrame:
 @st.cache_data(ttl=3600)
 def load_financials_scores() -> pd.DataFrame:
     try:
-        resp = requests.get(f"{get_api_base_url()}/gold/financials-score/latest", timeout=120)
+        resp = requests.get(f"{get_api_base_url()}/gold/financials-score/latest", headers=_api_headers(), timeout=120)
         resp.raise_for_status()
         return pd.DataFrame(resp.json())
     except Exception:
@@ -104,7 +114,7 @@ def load_financials_scores() -> pd.DataFrame:
 @st.cache_data(ttl=3600)
 def load_article_sentiments() -> pd.DataFrame:
     try:
-        resp = requests.get(f"{get_api_base_url()}/gold/article-sentiment/latest", timeout=120)
+        resp = requests.get(f"{get_api_base_url()}/gold/article-sentiment/latest", headers=_api_headers(), timeout=120)
         resp.raise_for_status()
         return pd.DataFrame(resp.json())
     except Exception:

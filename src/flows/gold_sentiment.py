@@ -26,7 +26,7 @@ from prefect.cache_policies import NO_CACHE  # noqa: E402
 
 from gold.sentiment_scorer import MODEL, score_article  # noqa: E402
 
-GCP_PROJECT = "bootcamp-project-pea-pme"
+GCP_PROJECT = "arched-run-488313-h2"
 DBT_PROJECT_DIR = Path(__file__).parent.parent.parent / "dbt"
 SILVER_TABLE = f"{GCP_PROJECT}.silver.rss_articles"
 GOLD_TABLE = f"{GCP_PROJECT}.gold.article_sentiment"

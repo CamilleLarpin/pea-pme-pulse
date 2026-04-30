@@ -19,11 +19,11 @@ FEED_URLS = {
     ),
 }
 
-BQ_PROJECT = "bootcamp-project-pea-pme"
+BQ_PROJECT = "arched-run-488313-h2"
 BQ_DATASET = "bronze"
 BQ_TABLE = "google_news_rss"
 
-GCS_BUCKET = "project-pea-pme"
+GCS_BUCKET = "pea-pme-yf"
 GCS_PREFIX = "rss_google_news"
 
 
